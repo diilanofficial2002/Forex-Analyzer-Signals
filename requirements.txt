@@ -1,0 +1,15 @@
+# --- Web Scraping & Data Handling ---
+playwright
+beautifulsoup4
+lxml
+requests
+pandas
+pandas-ta
+numpy==1.26.4
+
+# --- AI & Environment ---
+openai
+python-dotenv
+
+# --- IQ Option API Dependency ---
+websocket-client==0.56.0

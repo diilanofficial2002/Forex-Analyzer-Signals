@@ -1,0 +1,7 @@
+.venv/
+.env
+debug/
+temp/
+**/__pycache__/
+
+sideProject/
