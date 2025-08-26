@@ -74,3 +74,15 @@
 9:00pm GBP [Low] MPC Member Mann Speaks A: F: P:
 9:00pm USD [Medium] CB Consumer Confidence A: F:96.4 P:97.2
 9:00pm USD [Medium] Richmond Manufacturing Index A: F:-11 P:-20
+📰 11 events
+1:30am CAD [High] BOC Gov Macklem Speaks A: F: P:
+3:30am USD [Low] API Weekly Statistical Bulletin A: F: P:
+3:30am AUD [Low] MI Leading Index m/m A: F: P:0.0%
+8:30am AUD [High] CPI y/y A: F:2.3% P:1.9%
+8:30am AUD [Low] Construction Work Done q/q A: F:1.0% P:0.0%
+1:00pm EUR [Low] German GfK Consumer Climate A: F:-21.5 P:-21.5
+3:00pm CHF [Low] UBS Economic Expectations A: F: P:2.4
+5:00pm GBP [Low] CBI Realized Sales A: F:-26 P:-34
+8:00pm CNY [Low] CB Leading Index m/m A: F: P:-0.2%
+9:30pm USD [Low] Crude Oil Inventories A: F:-1.7M P:-6.0M
+Tentative USD [Low] FOMC Member Barkin Speaks A: F: P:
