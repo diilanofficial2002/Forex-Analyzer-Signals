@@ -1,6 +1,6 @@
 PAIR: {pair}
 
-# Market Snapshot (JST)
+# Market Snapshot (Bangkok)
 Spot Bid: {spot_bid}
 Spot Ask: {spot_ask}
 Spot Mid: {spot_mid}
@@ -10,7 +10,7 @@ Prev D1 High/Low/Close: {prev_day_high} / {prev_day_low} / {prev_day_close}
 D1 ATR(14): {d1_atr14}
 D1 ADR(20): {d1_adr20}
 
-Latest Candles (local timestamps)
+Latest Candles (Bangkok timestamps)
 H4: {latest_h4_ict}
 H1: {latest_h1_ict}
 M15: {latest_m15_ict}

@@ -1,55 +1,121 @@
-name: forex-bot
+name: Forex Pending-Order Bot
 
 on:
+  # Hourly for 06:00–18:00 Asia/Bangkok (UTC+7) → 23:00–11:00 UTC
   schedule:
-    - cron: "0 23 * * 0-4" # 06:00 ICT Mon–Fri
-  workflow_dispatch:
+    - cron: "0 23 * * *"
+    - cron: "0 0 * * *"
+    - cron: "0 1 * * *"
+    - cron: "0 2 * * *"
+    - cron: "0 3 * * *"
+    - cron: "0 4 * * *"
+    - cron: "0 5 * * *"
+    - cron: "0 6 * * *"
+    - cron: "0 7 * * *"
+    - cron: "0 8 * * *"
+    - cron: "0 9 * * *"
+    - cron: "0 10 * * *"
+    - cron: "0 11 * * *"
+  workflow_dispatch: {}
+
+# allow pushing changes back to the repo
+permissions:
+  contents: write
+
+concurrency:
+  group: forex-bot
+  cancel-in-progress: true
 
 jobs:
-  run:
+  run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    env:
+      PYTHONUNBUFFERED: "1"
+      TRADING_TZ: "Asia/Bangkok"
+      DEFAULT_SPREAD_PIPS: "1.0"
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TYPHOON_API_KEY: ${{ secrets.TYPHOON_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      CHAT_ID: ${{ secrets.CHAT_ID }}
+      IQ_USER: ${{ secrets.IQ_USER }}
+      IQ_PASS: ${{ secrets.IQ_PASS }}
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout (track default branch, non-detached)
+        uses: actions/checkout@v4
+        with:
+          # checkout the default branch so we can push back to it
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install deps
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ms-playwright-${{ runner.os }}-
+
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          python - <<'PY'
-          try:
-              import playwright; import sys
-              from playwright._impl._driver import compute_driver_executable
-              print("Playwright OK")
-          except Exception as e:
-              print("Playwright import warning:", e)
-          PY
-      - name: Install Python Dependencies
-        run: |
-          python -m pip install --upgrade pip
+          python -m pip install -U pip
           pip install -r requirements.txt
           pip install -U git+https://github.com/iqoptionapi/iqoptionapi.git@7.1.1
-      - name: Prepare ENV
-        run: echo "ENV ready"
-        env:
-          IQ_USER: ${{ secrets.IQ_USER }}
-          IQ_PASS: ${{ secrets.IQ_PASS }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          TYPHOON_API_KEY: ${{ secrets.TYPHOON_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
-          DEFAULT_SPREAD_PIPS: "1.0"
-          TRADING_TZ: "Asia/Bangkok"
-      - name: Run
-        env:
-          IQ_USER: ${{ secrets.IQ_USER }}
-          IQ_PASS: ${{ secrets.IQ_PASS }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          TYPHOON_API_KEY: ${{ secrets.TYPHOON_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
-          DEFAULT_SPREAD_PIPS: "1.0"
-          TRADING_TZ: "Asia/Bangkok"
+
+      - name: Install Playwright (Chromium) + system deps
+        run: |
+          python -m playwright install chromium
+          python -m playwright install-deps chromium || true
+
+      - name: Run bot (one shot)
         run: |
           python new_forex.py
+
+      - name: Commit & push changes in data/ (if any)
+        if: always()
+        run: |
+          set -e
+          # Ensure we are on a named branch (not detached)
+          BRANCH=$(git branch --show-current)
+          if [ -z "$BRANCH" ]; then
+            BRANCH="${{ github.event.repository.default_branch }}"
+            git checkout "$BRANCH"
+          fi
+
+          # Pull latest and rebase to avoid conflicts
+          git config pull.rebase true
+          git pull --rebase origin "$BRANCH" || true
+
+          # Configure committer
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Add only data/ changes (ignore other files)
+          if [ -d "data" ]; then
+            if [ -n "$(git status --porcelain data/)" ]; then
+              git add data/
+              git commit -m "chore(data): update ledger/artifacts [skip ci]"
+              git push origin HEAD:"$BRANCH"
+              echo "✅ Pushed updated data/"
+            else
+              echo "ℹ️ No changes in data/; nothing to commit."
+            fi
+          else
+            echo "ℹ️ data/ not found; nothing to commit."
+          fi

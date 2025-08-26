@@ -1,6 +1,6 @@
 # strategy_engine.py
-# OOP engine for pending-order strategy with weekly tracking, OCO combos,
-# RR enforcement, daily D1 review, and robust parsing of model outputs.
+# OOP engine for pending-order strategy with weekly tracking (Bangkok TZ),
+# allowed OCO combos, RR enforcement, daily D1 review, and robust parsing.
 
 from __future__ import annotations
 from dataclasses import dataclass, asdict
@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 @dataclass
 class StrategyConfig:
+    # Default trading timezone for all weekly/time-based operations
     timezone_name: str = os.getenv("TRADING_TZ", "Asia/Bangkok")
     pairs: List[str] = None
     weekly_pip_goal: int = 1000
@@ -44,7 +45,6 @@ class PipMath:
     @staticmethod
     def add_pips(pair: str, price: float, pips: float) -> float:
         unit = 0.01 if PipMath.is_jpy(pair) else 0.0001
-        # Keep sensible digits (3 for JPY, 5 otherwise)
         return round(price + (pips * unit), 3 if PipMath.is_jpy(pair) else 5)
 
 
@@ -60,13 +60,13 @@ class PendingOrder:
     entry: float
     sl: float
     tp: float
-    tif_date: str      # "YYYY-MM-DD"
-    created_at: str    # "YYYY-MM-DD"
+    tif_date: str      # "YYYY-MM-DD" (expiry)
+    created_at: str    # "YYYY-MM-DD" (Bangkok date)
     status: str = "PENDING"  # PENDING | TRIGGERED | CLOSED | CANCELLED
     result: Optional[str] = None  # "TP" | "SL" | "UNCERTAIN" | None
 
     def rr(self) -> Optional[float]:
-        """Compute R:R from entry/SL/TP respecting side direction."""
+        """Compute risk:reward respecting side direction."""
         if self.side == "LONG":
             risk = self.entry - self.sl
             reward = self.tp - self.entry
@@ -80,7 +80,12 @@ class PendingOrder:
 
 @dataclass
 class OCOPlan:
-    """OCO = One Cancels Other; we allow the three combos specified by user."""
+    """
+    Accept ONLY these combos (per user spec):
+      1) (Buy Stop, Sell Stop)
+      2) (Buy Limit, Buy Stop)
+      3) (Sell Limit, Sell Stop)
+    """
     order_a: Optional[PendingOrder]
     order_b: Optional[PendingOrder]
 
@@ -88,12 +93,6 @@ class OCOPlan:
         return [o for o in (self.order_a, self.order_b) if o]
 
     def validate_combo(self) -> bool:
-        """
-        Only allow EXACTLY these combos:
-          1) (Buy Stop, Sell Stop)       -> breakout both sides
-          2) (Buy Limit, Buy Stop)       -> both LONG (mean reversion + breakout)
-          3) (Sell Limit, Sell Stop)     -> both SHORT (mean reversion + breakout)
-        """
         if not (self.order_a and self.order_b):
             return False
         types = (self.order_a.order_type, self.order_b.order_type)
@@ -113,9 +112,7 @@ class OCOPlan:
         return True
 
     def sanity_vs_spot(self, spot: float, buffer_pips: float, pair: str) -> bool:
-        """
-        Basic sanity: check entry vs spot + small buffer for stops; limits should be across the spot.
-        """
+        """Basic sanity against current spot with a small buffer for stops."""
         unit = 0.01 if PipMath.is_jpy(pair) else 0.0001
         buf = buffer_pips * unit
         ok = True
@@ -132,12 +129,12 @@ class OCOPlan:
 
 
 # ------------------------------
-# Weekly state (persist/reset Monday JST)
+# Weekly state (Bangkok Monday reset)
 # ------------------------------
 
 class WeeklyLedger:
     """
-    Weekly ledger auto-resets every Monday (JST by default).
+    Weekly ledger auto-resets every Monday based on Asia/Bangkok (UTC+7).
     Stores orders + realized pips for the running week.
     """
     def __init__(self, cfg: StrategyConfig):
@@ -146,22 +143,30 @@ class WeeklyLedger:
         os.makedirs(cfg.state_dir, exist_ok=True)
         self._state = self._load()
 
-    def _monday_jst(self) -> datetime.date:
-        jst = timezone(timedelta(hours=9))
-        today_jst = datetime.utcnow().replace(tzinfo=timezone.utc).astimezone(jst).date()
-        return (today_jst - timedelta(days=today_jst.weekday()))
+    @staticmethod
+    def _bangkok_monday() -> datetime.date:
+        ict = timezone(timedelta(hours=7))
+        today_ict = datetime.utcnow().replace(tzinfo=timezone.utc).astimezone(ict).date()
+        return (today_ict - timedelta(days=today_ict.weekday()))
 
     def _load(self) -> dict:
+        # Create empty file for current week if missing
         if not os.path.exists(self.path):
-            return {"week_monday": str(self._monday_jst()), "orders": [], "realized_pips": 0.0}
+            data = {"week_monday": str(self._bangkok_monday()), "orders": [], "realized_pips": 0.0}
+            with open(self.path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            return data
+        # Load or recover
         try:
             with open(self.path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception:
-            data = {"week_monday": str(self._monday_jst()), "orders": [], "realized_pips": 0.0}
-        # Reset if file belongs to older week
-        if data.get("week_monday") != str(self._monday_jst()):
-            data = {"week_monday": str(self._monday_jst()), "orders": [], "realized_pips": 0.0}
+            data = {"week_monday": str(self._bangkok_monday()), "orders": [], "realized_pips": 0.0}
+        # Auto-reset if the stored week is stale
+        if data.get("week_monday") != str(self._bangkok_monday()):
+            data = {"week_monday": str(self._bangkok_monday()), "orders": [], "realized_pips": 0.0}
+            with open(self.path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
         return data
 
     def save(self):
@@ -190,6 +195,14 @@ class WeeklyLedger:
     def add_realized(self, pips: float):
         self._state["realized_pips"] = float(self.realized() + pips)
         self.save()
+
+    def count_active(self, pair: Optional[str] = None) -> int:
+        """Count orders with status PENDING or TRIGGERED."""
+        c = 0
+        for _, row in self.iter_indices(pair):
+            if row.get("status") in ("PENDING", "TRIGGERED"):
+                c += 1
+        return c
 
 
 # ------------------------------
@@ -251,18 +264,15 @@ class ExecutionSimulator:
 
 class TyphoonParser:
     """
-    Parse a standardized block. We accept either:
-    1) Bold markers:
-       **COMBO:** BUY_LIMIT+BUY_STOP
-       **TIF:** 2025-08-28
-       **PRIMARY ORDER:** LONG — Buy Limit @ 1.23450
-       **TP:** 1.23650
-       **SL:** 1.23350
-       **SECONDARY (OCO):** LONG — Buy Stop @ 1.23520
-       **TP:** 1.23720
-       **SL:** 1.23420
-
-    2) Or the same fields without bold (fallback).
+    Parse a standardized block. Expected schema:
+    **COMBO:** BUY_LIMIT+BUY_STOP | SELL_LIMIT+SELL_STOP | BUY_STOP+SELL_STOP
+    **TIF:** 2025-08-28
+    **PRIMARY ORDER:** LONG — Buy Limit @ 1.23450
+    **TP:** 1.23650
+    **SL:** 1.23350
+    **SECONDARY (OCO):** LONG — Buy Stop @ 1.23520
+    **TP:** 1.23720
+    **SL:** 1.23420
     """
 
     @staticmethod
@@ -275,20 +285,16 @@ class TyphoonParser:
 
     @staticmethod
     def parse(summary_text: str, pair: str, current_date: str, tif_date: str) -> OCOPlan:
-        combo = TyphoonParser._find(r"(?:\*\*COMBO:\*\*|COMBO:)\s*([A-Z_+\s]+)", summary_text)
-        # Primary
         prim = TyphoonParser._find(
             r"(?:\*\*PRIMARY ORDER:\*\*|PRIMARY ORDER:)\s*(LONG|SHORT)\s*—\s*(Buy Stop|Sell Stop|Buy Limit|Sell Limit)\s*@\s*([\d\.]+)",
             summary_text
         )
-        # Secondary
         sec = TyphoonParser._find(
             r"(?:\*\*SECONDARY\s*\(OCO\):\*\*|SECONDARY\s*\(OCO\):)\s*(LONG|SHORT)\s*—\s*(Buy Stop|Sell Stop|Buy Limit|Sell Limit)\s*@\s*([\d\.]+)",
             summary_text
         )
-        # Capture TP/SL per block (allow two sets)
-        tps  = TyphoonParser._findall(r"(?:\*\*TP:\*\*|TP:)\s*([\d\.]+)", summary_text)
-        sls  = TyphoonParser._findall(r"(?:\*\*SL:\*\*|SL:)\s*([\d\.]+)", summary_text)
+        tps = TyphoonParser._findall(r"(?:\*\*TP:\*\*|TP:)\s*([\d\.]+)", summary_text)
+        sls = TyphoonParser._findall(r"(?:\*\*SL:\*\*|SL:)\s*([\d\.]+)", summary_text)
 
         def mk_order(m: Optional[re.Match], tp: Optional[float], sl: Optional[float]) -> Optional[PendingOrder]:
             if not (m and tp and sl):
@@ -300,7 +306,6 @@ class TyphoonParser:
                 tif_date=tif_date, created_at=current_date
             )
 
-        # Heuristic: first TP/SL → primary, second → secondary (if present)
         p_tp = float(tps[0]) if len(tps) >= 1 else None
         p_sl = float(sls[0]) if len(sls) >= 1 else None
         s_tp = float(tps[1]) if len(tps) >= 2 else p_tp
@@ -309,8 +314,7 @@ class TyphoonParser:
         order_a = mk_order(prim, p_tp, p_sl)
         order_b = mk_order(sec,  s_tp, s_sl)
 
-        # If model outputs the straddle (Buy Stop & Sell Stop), ensure sides
-        # are consistent with types to avoid mistakes:
+        # If side is malformed, infer from order type
         def infer_side(otype: str) -> str:
             return "LONG" if "Buy" in otype else "SHORT"
 
@@ -322,11 +326,11 @@ class TyphoonParser:
 
 
 # ------------------------------
-# Daily review / planning
+# Daily review / planning helpers
 # ------------------------------
 
 class ReviewEngine:
-    """Daily review Tue-Fri; Monday is implicit weekly reset via WeeklyLedger load()."""
+    """Daily review Tue–Fri; Monday is implicit weekly reset via WeeklyLedger load()."""
 
     @staticmethod
     def max_hold_days(weekday: int) -> int:
@@ -370,7 +374,7 @@ class OrderPlanner:
     """Helpers for buffer and TIF calculations."""
     @staticmethod
     def buffer_pips(atr14: Optional[float], spread_pips: float, is_jpy: bool) -> float:
-        # Use 10% of ATR as trigger buffer, but never below (spread + 2p)
+        # 10% ATR as buffer; never below (spread + 2p)
         try:
             if atr14 and float(atr14) > 0:
                 atr_pips = float(atr14) / (0.01 if is_jpy else 0.0001)
