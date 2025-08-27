@@ -1,20 +1,27 @@
 # new_forex.py
-# Orchestrator: scrape (ForexFactory) -> prompts -> GPT-5-mini/Typhoon -> parse -> validate -> persist -> H1 check -> EOD summary -> Telegram.
-# - Includes the original scraper (Playwright primary, requests+BS fallback, lazy import).
-# - Uses H1 as reference for order status checks.
-# - Deterministic JSON output (+ confidence).
-# - Scheduler-friendly: near-news / EOD; plus daily-quota fallback = >=1 order per pair per day.
-# - Day profile: Mon wide TP & fewer plans → Fri narrow TP & more plans.
+# Orchestrator: scrape (ForexFactory) -> GPT-5-mini analysis -> parse/validate -> persist -> H1 status check
+# -> near-news/EOD gating -> Telegram.
+# - Typhoon is used ONLY to format/summarize the accepted GPT plan into a Telegram-friendly message.
+# - No failsafe generation. If GPT plan is invalid → reject and report per-pair reason.
+# - Impact gating supports both High & Medium via env NEWS_IMPACTS (default: "high,medium").
 
-import os, re, json, time, math, argparse
-from typing import List, Dict, Optional
+import os
+import re
+import json
+import time
+import argparse
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
+# scraping deps
 from bs4 import BeautifulSoup
 import requests
+
+# model/client deps
 from openai import OpenAI
 
+# local modules
 from get_data import IQDataFetcher
 from strategy_engine import (
     StrategyConfig, OCOPlan, PipMath, WeeklyLedger,
@@ -22,23 +29,34 @@ from strategy_engine import (
 )
 from tele_signals import TelegramNotifier, TyphoonForexAnalyzer, log_today_summary_only
 
+# --------------------- Env & constants ---------------------
+
 load_dotenv()
 
-OPENAI_API_KEY     = os.getenv("OPENAI_API_KEY")
-TYPHOON_API_KEY    = os.getenv("TYPHOON_API_KEY")  # optional fallback
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
-MODEL_ID           = os.getenv("MODEL_ID", "gpt-5-mini")
-PAIRS              = [p.strip() for p in os.getenv("PAIRS", "EUR/USD,GBP/USD,USD/JPY,EUR/GBP,EUR/CHF").split(",")]
-BKK_TZ = timezone(timedelta(hours=7))
+client = OpenAI()
+OPENAI_API_KEY       = os.getenv("OPENAI_API_KEY")
+TELEGRAM_BOT_TOKEN   = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID     = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
+MODEL_ID             = os.getenv("MODEL_ID", "gpt-5-mini")
+PAIRS                = [p.strip() for p in os.getenv("PAIRS", "EUR/USD,GBP/USD,USD/JPY,EUR/GBP,EUR/CHF").split(",")]
+NEWS_WINDOW_MIN      = int(os.getenv("NEWS_WINDOW_MIN", "20"))
+BKK_TZ               = timezone(timedelta(hours=7))
 
+# Which impacts to consider for near-news gating ("high,medium" by default)
+IMPACT_SET = set(
+    s.strip().lower()
+    for s in os.getenv("NEWS_IMPACTS", "high,medium").split(",")
+    if s.strip()
+)
+
+if not OPENAI_API_KEY:
+    raise RuntimeError("Missing OPENAI_API_KEY")
 if not TELEGRAM_BOT_TOKEN:
     raise RuntimeError("Missing TELEGRAM_BOT_TOKEN")
 if not TELEGRAM_CHAT_ID:
     raise RuntimeError("Missing TELEGRAM_CHAT_ID (or CHAT_ID)")
 
-
-# ---------- Prompt loading ----------
+# --------------------- Prompt loading ---------------------
 
 def _load_text(path: str) -> str:
     with open(path, "r", encoding="utf-8") as f:
@@ -48,20 +66,20 @@ SYSTEM_PROMPT = _load_text("prompts/system_gpt5.txt")
 USER_TEMPLATE = _load_text("prompts/user_template.txt")
 
 def format_user_prompt(ctx: dict) -> str:
-    """Format a deterministic, data-first user prompt."""
+    """
+    Compose deterministic, data-first prompt for GPT-5-mini.
+    ctx keys expected:
+      - pair
+      - tif_date (YYYY-MM-DD)
+      - recent_news (list[dict] of {event_id,title,impact,actual,forecast,previous,currency,time_iso})
+      - indicators: {"H1": {"ema_fast":.., "ema_slow":.., "rsi":..}, "spot": float}
+    """
     return USER_TEMPLATE.format(**ctx)
 
-
-# ---------- Model clients ----------
+# --------------------- OpenAI & helper ---------------------
 
 def _openai_client() -> OpenAI:
-    assert OPENAI_API_KEY, "Missing OPENAI_API_KEY"
     return OpenAI(api_key=OPENAI_API_KEY)
-
-def _typhoon_client() -> TyphoonForexAnalyzer:
-    assert TYPHOON_API_KEY, "Missing TYPHOON_API_KEY"
-    return TyphoonForexAnalyzer(TYPHOON_API_KEY)
-
 
 # =====================================================================
 #                           SCRAPER SECTION
@@ -72,7 +90,8 @@ def _wait_for_event_rows(page, min_rows: int = 5, timeout_ms: int = 60000):
     while True:
         try:
             cnt = page.locator("table.calendar__table tr.calendar__row[data-event-id]").count()
-            if cnt >= min_rows: return
+            if cnt >= min_rows:
+                return
         except Exception:
             pass
         if (time.time() - start) * 1000 > timeout_ms:
@@ -80,7 +99,6 @@ def _wait_for_event_rows(page, min_rows: int = 5, timeout_ms: int = 60000):
         time.sleep(0.25)
 
 def scrape_ff_core_rows(day: str = "today", tz: str = "Asia/Bangkok", headless: bool = True) -> list:
-    """High-fidelity DOM scraper for ForexFactory calendar (lazy Playwright import)."""
     try:
         from playwright.sync_api import sync_playwright
     except Exception as e:
@@ -88,26 +106,37 @@ def scrape_ff_core_rows(day: str = "today", tz: str = "Asia/Bangkok", headless: 
         return []
 
     tz_cookie_val = tz.replace("/", "%2F")
-    ua = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-          "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+    ua = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+          "AppleWebKit/537.36 (KHTML, like Gecko) "
+          "Chrome/122.0.0.0 Safari/537.36")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless,
-            args=["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage"])
+        browser = p.chromium.launch(
+            headless=headless,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+        )
         context = browser.new_context(user_agent=ua, locale="en-US")
-        context.add_cookies([{"name":"fftimezone","value":tz_cookie_val,"domain":".forexfactory.com","path":"/"}])
+        context.add_cookies([{
+            "name": "fftimezone",
+            "value": tz_cookie_val,
+            "domain": ".forexfactory.com",
+            "path": "/"
+        }])
         page = context.new_page()
         page.goto(f"https://www.forexfactory.com/calendar?day={day}",
                   wait_until="domcontentloaded", timeout=90000)
         page.wait_for_selector("table.calendar__table", state="visible", timeout=60000)
-        try: page.wait_for_load_state("load", timeout=30000)
-        except Exception: pass
+        try:
+            page.wait_for_load_state("load", timeout=30000)
+        except Exception:
+            pass
         _wait_for_event_rows(page, min_rows=3, timeout_ms=60000)
 
         rows = page.query_selector_all("table.calendar__table > tbody > tr")
         events, current_date, last_time = [], None, None
 
         def _impact_from_cell(cell):
-            if not cell: return ""
+            if not cell:
+                return ""
             icon = cell.query_selector("span[title]")
             if icon:
                 t = (icon.get_attribute("title") or "").strip().lower()
@@ -125,16 +154,21 @@ def scrape_ff_core_rows(day: str = "today", tz: str = "Asia/Bangkok", headless: 
         for r in rows:
             rclass = (r.get_attribute("class") or "")
             if "calendar__row--day-breaker" in rclass:
-                try: current_date = (r.query_selector("td.calendar__cell") or r).inner_text().strip()
-                except Exception: current_date = current_date or ""
+                try:
+                    current_date = (r.query_selector("td.calendar__cell") or r).inner_text().strip()
+                except Exception:
+                    current_date = current_date or ""
                 continue
-            if "calendar__details" in rclass or "calendar__row" not in rclass: continue
+            if "calendar__details" in rclass or "calendar__row" not in rclass:
+                continue
 
             event_id = r.get_attribute("data-event-id") or ""
             time_cell = r.query_selector("td.calendar__time span")
             time_txt = (time_cell.inner_text().strip() if time_cell else "") if time_cell else ""
-            if not time_txt: time_txt = last_time or ""
-            else: last_time = time_txt
+            if not time_txt:
+                time_txt = last_time or ""
+            else:
+                last_time = time_txt
 
             ccy_cell = r.query_selector("td.calendar__currency span")
             currency = (ccy_cell.inner_text() or "").strip() if ccy_cell else ""
@@ -145,9 +179,13 @@ def scrape_ff_core_rows(day: str = "today", tz: str = "Asia/Bangkok", headless: 
             def _txt(sel):
                 cell = r.query_selector(sel)
                 return (cell.inner_text().strip() if cell else "")
-            actual   = _txt("td.calendar__actual")
+            actual = _txt("td.calendar__actual")
             forecast = _txt("td.calendar__forecast")
-            previous = _txt("td.calendar__previous span") or ""
+
+            previous = ""
+            prev_cell = r.query_selector("td.calendar__previous span")
+            if prev_cell:
+                previous = (prev_cell.inner_text() or "").strip()
 
             if not time_txt: time_txt = "Tentative"
             if currency and event_title:
@@ -161,7 +199,6 @@ def scrape_ff_core_rows(day: str = "today", tz: str = "Asia/Bangkok", headless: 
         return events
 
 def scrape_forex_factory_requests() -> list:
-    """Fallback scraper using requests + BeautifulSoup (best-effort)."""
     print("🔄 Trying fallback scraper with requests...")
     headers = {'User-Agent': 'Mozilla/5.0'}
     cookies = {'fftimezone': 'Asia%2FBangkok'}
@@ -173,15 +210,22 @@ def scrape_forex_factory_requests() -> list:
         if not table:
             print("❌ Calendar table not found in requests HTML")
             return []
+        rows = table.select("tr.calendar__row")
         out = []
-        for row in table.select("tr.calendar__row"):
+        for row in rows:
             cells = [c.get_text(strip=True) for c in row.find_all('td')]
-            if len(cells) < 6: continue
+            if len(cells) < 6:
+                continue
             out.append({
-                "Time": cells[0] if cells else "", "Currency": (cells[1] if len(cells) > 1 else ""),
-                "Impact": (cells[2] if len(cells) > 2 else ""), "Event": (cells[3] if len(cells) > 3 else ""),
-                "Actual": (cells[4] if len(cells) > 4 else ""), "Forecast": (cells[5] if len(cells) > 5 else ""),
+                "Time": cells[0] if cells else "",
+                "Currency": (cells[1] if len(cells) > 1 else ""),
+                "Impact": (cells[2] if len(cells) > 2 else ""),
+                "Event": (cells[3] if len(cells) > 3 else ""),
+                "Actual": (cells[4] if len(cells) > 4 else ""),
+                "Forecast": (cells[5] if len(cells) > 5 else ""),
                 "Previous": (cells[6] if len(cells) > 6 else ""),
+                "event_id": "",
+                "date_label": "",
             })
         print(f"✅ Requests method extracted {len(out)} events!")
         return out
@@ -212,296 +256,417 @@ def scrape_news_preferred(day: str = "today", tz: str = "Asia/Bangkok") -> list:
         if core:
             print("Sample:", core[min(2, len(core)-1)])
         mapped = core_rows_to_basic_rows(core)
-        if mapped: return mapped
+        if mapped:
+            return mapped
     except Exception as e:
         print(f"❌ Playwright failed: {e}")
     return scrape_forex_factory_requests()
 
-# --- Time parsing (Bangkok) ---
+# --- Impact/time helpers ---
+
+def _impact_allowed(impact_str: str) -> bool:
+    return (impact_str or "").strip().lower() in IMPACT_SET
 
 def _parse_ff_time_to_bkk_iso(date_label: str, time_txt: str) -> Optional[str]:
     if not time_txt or time_txt.lower() in ("all day", "tentative"):
         return None
     now_bkk = datetime.now(BKK_TZ)
     try:
-        base = datetime.strptime(f"{date_label} {now_bkk.year}", "%a %b %d %Y").replace(tzinfo=BKK_TZ)
+        base = datetime.strptime(f"{date_label} {now_bkk.year}", "%a %b %d %Y")
+        base = base.replace(tzinfo=BKK_TZ)
     except Exception:
         try:
             base = datetime.strptime(f"{date_label} {now_bkk.year}", "%b %d %Y").replace(tzinfo=BKK_TZ)
         except Exception:
             return None
+
     m = re.match(r"^\s*(\d{1,2}):(\d{2})\s*([ap]m)\s*$", time_txt.strip().lower())
-    if not m: return None
-    hh, mm, ampm = int(m.group(1)), int(m.group(2)), m.group(3)
+    if not m:
+        return None
+    hh = int(m.group(1)); mm = int(m.group(2)); ampm = m.group(3)
     if hh == 12: hh = 0
     if ampm == "pm": hh += 12
-    return base.replace(hour=hh, minute=mm, second=0, microsecond=0).isoformat()
+    dt = base.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    return dt.isoformat()
 
-def extract_high_impact_windows(events_7: List[Dict], window_min: int = 20) -> List[datetime]:
-    times = []
-    for ev in events_7 or []:
-        if (ev.get("Impact") or "").strip().lower() != "high": continue
-        iso = _parse_ff_time_to_bkk_iso((ev.get("date_label") or ""), (ev.get("Time") or ""))
-        if iso:
-            try: times.append(datetime.fromisoformat(iso))
-            except Exception: pass
-    uniq = {}
-    for t in times:
-        k = t.replace(second=0, microsecond=0); uniq[k] = k
-    return sorted(uniq.values())
-
-def _pair_ccys(pair: str):
+def filter_news_times_for_pair(events_7: List[Dict], pair: str) -> List[datetime]:
+    """Return High/Medium-impact times (per env) for the base/quote currencies of the pair."""
     base, quote = pair.replace(" ", "").upper().split("/")
-    return base, quote
-
-def filter_news_times_for_pair(_high_times: List[datetime], events_7: List[Dict], pair: str) -> List[datetime]:
-    base, quote = _pair_ccys(pair)
-    allowed = {base, quote}
+    allowed_ccy = {base, quote}
     out = []
     for ev in events_7 or []:
         cur = (ev.get("Currency") or "").strip().upper()
-        if cur in allowed and (ev.get("Impact","").strip().lower() == "high"):
+        impact = (ev.get("Impact") or "").strip()
+        if cur in allowed_ccy and _impact_allowed(impact):
             iso = _parse_ff_time_to_bkk_iso(ev.get("date_label",""), ev.get("Time",""))
             if iso:
-                try: out.append(datetime.fromisoformat(iso))
-                except Exception: pass
+                try:
+                    out.append(datetime.fromisoformat(iso))
+                except Exception:
+                    pass
+    # Dedup by minute
     seen = set(); unique = []
     for t in sorted(out):
         k = t.replace(second=0, microsecond=0)
-        if k not in seen: seen.add(k); unique.append(k)
+        if k not in seen:
+            seen.add(k); unique.append(k)
     return unique
 
-
-# =====================================================================
-#                          MODEL PARSER
-# =====================================================================
-
-def _extract_json_block(text: str) -> dict:
-    fence = re.search(r"```json\s*([\s\S]*?)\s*```", text, flags=re.IGNORECASE)
-    if fence: return json.loads(fence.group(1))
-    obj = re.search(r"\{[\s\S]*\}", text)
-    if not obj: raise ValueError("Model output missing JSON plan.")
-    return json.loads(obj.group(0))
-
-def parse_model_output_to_plan(text: str, pair: str, ctx: dict, cfg: StrategyConfig):
-    obj = _extract_json_block(text)
-    for k in ["pair","decision","oco_combo","orders","time_in_force","status","confidence","reason"]:
-        if k not in obj:
-            raise ValueError(f"Missing key: {k}")
-
-    combo = tuple(obj["oco_combo"])
-    legs: List[OrderLeg] = []
-    for o in obj["orders"]:
-        legs.append(OrderLeg(order_type=o["type"], entry=float(o["entry"]), sl=float(o["sl"]), tp=float(o["tp"])))
-
-    now_utc = datetime.now(BKK_TZ).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    plan = OCOPlan(
-        pair=obj["pair"], combo=combo, legs=tuple(legs),
-        time_in_force=obj["time_in_force"], status=obj.get("status","pending"),
-        confidence=float(obj["confidence"]), created_at=obj.get("created_at", now_utc),
-        updated_at=now_utc, source=obj.get("source", ctx.get("source", {})),
-        decision=obj["decision"], reason=obj.get("reason",""),
-    )
-
-    spot = ctx["indicators"]["spot"]
-    if (not plan.validate_combo(cfg)
-        or (not plan.validate_rr(cfg.rr_min, cfg.rr_max))
-        or (spot is None)
-        or (not plan.sanity_vs_spot(spot, cfg.buffer_pips(pair), pair))):
-        plan.decision = "reject"
-        plan.reason = "Policy validation failed (combo/RR/spot-sanity)"
-    return plan
-
-
-# =====================================================================
-#                     NEWS WINDOW & EOD SUMMARY
-# =====================================================================
-
-def within_news_window(now_bkk: datetime, high_impact_times: list, window_min: int = 20) -> bool:
-    for t in high_impact_times:
+def within_news_window(now_bkk: datetime, times: List[datetime], window_min: int) -> bool:
+    for t in times:
         if abs((now_bkk - t).total_seconds()) <= window_min * 60:
             return True
     return False
 
 def is_eod_summary_time(now_bkk: datetime) -> bool:
-    return (now_bkk.hour == 20 and now_bkk.minute >= 59)
-
-def get_day_profile(now_bkk: datetime, cfg: StrategyConfig) -> dict:
-    wd = now_bkk.weekday()  # Mon=0
-    prof = cfg.weekday_profile.get(wd, cfg.weekday_profile[0]).copy()
-    prof["weekday"] = wd
-    return prof
-
+    return (now_bkk.hour == 21 and now_bkk.minute >= 30)
 
 # =====================================================================
-#                          ORCHESTRATION
+#                    MODEL OUTPUT PARSER SECTION
+# =====================================================================
+
+_ORDER_ALIASES = {
+    "buystop": "Buy Stop", "buy stop": "Buy Stop", "buy-stop": "Buy Stop", "buy_stop": "Buy Stop",
+    "sellstop": "Sell Stop", "sell stop": "Sell Stop", "sell-stop": "Sell Stop", "sell_stop": "Sell Stop",
+    "buylimit": "Buy Limit", "buy limit": "Buy Limit", "buy-limit": "Buy Limit", "buy_limit": "Buy Limit",
+    "selllimit": "Sell Limit", "sell limit": "Sell Limit", "sell-limit": "Sell Limit", "sell_limit": "Sell Limit",
+}
+
+def _norm_order_type(s: str) -> str:
+    if not isinstance(s, str):
+        return ""
+    key = s.strip().lower().replace("-", " ").replace("_", " ")
+    key = " ".join(key.split())
+    key = key.replace(" ", "")
+    return _ORDER_ALIASES.get(key, "").strip()
+
+def _extract_json_block(text: str) -> dict:
+    """
+    Extracts a JSON object from a string, supporting markdown code fences.
+    Now raises ValueError with more context on JSON decoding errors.
+    """
+    fence = re.search(r"```json\s*([\s\S]*?)\s*```", text, flags=re.IGNORECASE)
+    if fence:
+        try:
+            return json.loads(fence.group(1))
+        except json.JSONDecodeError as e:
+            # Raise a more informative error
+            raise ValueError(f"Invalid JSON in fenced block: {e}")
+
+    # Fallback to the first complete JSON object found
+    obj_match = re.search(r"\{[\s\S]*\}", text)
+    if not obj_match:
+        raise ValueError("Model output missing JSON plan.")
+    try:
+        return json.loads(obj_match.group(0))
+    except json.JSONDecodeError as e:
+        # Raise a more informative error
+        raise ValueError(f"Invalid JSON in raw text: {e}")
+
+def parse_model_output_to_plan(text: str, pair: str, ctx: dict, cfg: StrategyConfig) -> OCOPlan:
+    """
+    Parse GPT text → plan; normalize order types; enforce validations; return OCOPlan.
+    Rejection reasons are explicit and short for Telegram.
+    Now raises more specific ValueErrors.
+    """
+    try:
+        obj = _extract_json_block(text)
+    except ValueError as e:
+        # Re-raise the error so the caller can log it
+        print(f"DEBUG: JSON extraction failed for pair {pair}: {e}")
+        raise
+
+    required = ["pair", "decision", "oco_combo", "orders", "time_in_force",
+                "status", "confidence", "reason"]
+    for k in required:
+        if k not in obj:
+            # More specific error for missing keys
+            raise ValueError(f"Missing required key in JSON: '{k}'")
+
+    # Normalize combo
+    raw_combo = obj["oco_combo"]; combo_norm, unknown = [], []
+    for t in raw_combo:
+        nt = _norm_order_type(t)
+        if not nt: unknown.append(str(t))
+        combo_norm.append(nt or str(t).strip())
+    if unknown:
+        now_utc = datetime.now(BKK_TZ).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return OCOPlan(
+            pair=obj["pair"], combo=tuple(combo_norm), legs=tuple(),
+            time_in_force=obj["time_in_force"], status="pending",
+            confidence=float(obj.get("confidence", 0.0)),
+            created_at=obj.get("created_at", now_utc), updated_at=now_utc,
+            source=obj.get("source", ctx.get("source", {})),
+            decision="reject", reason=f"Unknown order type in combo: {unknown}",
+        )
+    combo = tuple(combo_norm)
+
+    # Normalize legs
+    legs, unknown_legs = [], []
+    for o in obj["orders"]:
+        t_raw = o["type"]; t_norm = _norm_order_type(t_raw)
+        if not t_norm:
+            unknown_legs.append(str(t_raw))
+            t_norm = str(t_raw).strip()
+        legs.append(
+            OrderLeg(order_type=t_norm, entry=float(o["entry"]),
+                     sl=float(o["sl"]), tp=float(o["tp"]))
+        )
+
+    now_utc = datetime.now(BKK_TZ).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    plan = OCOPlan(
+        pair=obj["pair"], combo=combo, legs=tuple(legs),
+        time_in_force=obj["time_in_force"], status=obj.get("status", "pending"),
+        confidence=float(obj["confidence"]),
+        created_at=obj.get("created_at", now_utc), updated_at=now_utc,
+        source=obj.get("source", ctx.get("source", {})),
+        decision=obj["decision"], reason=obj.get("reason", ""),
+    )
+
+    if unknown_legs:
+        plan.decision = "reject"; plan.reason = f"Unknown order type in legs: {unknown_legs}"
+        return plan
+
+    spot = ctx["indicators"]["spot"]
+    if spot is None:
+        plan.decision = "reject"; plan.reason = "No spot price in context"
+        return plan
+
+    # combo policy
+    if not plan.validate_combo(cfg):
+        plan.decision = "reject"; plan.reason = f"Invalid combo {list(combo)}"
+        return plan
+
+    # RR policy (AND across legs, per current policy)
+    if not plan.validate_rr(cfg.rr_min, cfg.rr_max):
+        # Prepare compact RR list for reason
+        rr_list = []
+        for leg in plan.legs:
+            risk = abs(leg.entry - leg.sl); reward = abs(leg.tp - leg.entry)
+            rr_list.append(round((reward / risk), 2) if risk > 0 else float("inf"))
+        plan.decision = "reject"; plan.reason = f"RR out of range {rr_list} not in [{cfg.rr_min},{cfg.rr_max}]"
+        return plan
+
+    # spot sanity
+    min_buf = cfg.buffer_pips(pair)
+    if not plan.sanity_vs_spot(spot, min_buf, pair):
+        plan.decision = "reject"; plan.reason = f"Entry not sane vs spot (min buffer {min_buf} pips)"
+        return plan
+
+    return plan
+
+# =====================================================================
+#                         ORCHESTRATION SECTION
 # =====================================================================
 
 def run_once(mode: str, dry_run: bool = False):
+    """
+    mode:
+      - "auto": run when near (High/Medium) news, or at EOD summary,
+                or if any pair has no order today (quota).
+      - "force": run immediately.
+    """
     cfg = StrategyConfig()
     ledger = WeeklyLedger(cfg.ledger_path, cfg.tz)
     ledger.reset_if_new_week()
 
-    # Scrape calendar (for timing/relevance)
+    # 1) News scrape → near-news times
     events_7 = scrape_news_preferred(day="today", tz="Asia/Bangkok")
-    high_impact_bkk = extract_high_impact_windows(events_7, window_min=20)
     now_bkk = datetime.now(BKK_TZ)
     today_iso = now_bkk.date().isoformat()
 
-    oa = _openai_client()
-    notifier = TelegramNotifier(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
-    fetcher  = IQDataFetcher()
+    near_pairs = []
+    for pair in PAIRS:
+        p_times = filter_news_times_for_pair(events_7, pair)
+        if within_news_window(now_bkk, p_times, NEWS_WINDOW_MIN):
+            near_pairs.append(pair)
 
-    # Prepare recent_news payload
+    # daily quota: process pairs with zero orders today (if ledger supports)
+    quota_pairs = []
+    if hasattr(ledger, "has_order_for_pair_on_date"):
+        for pair in PAIRS:
+            if not ledger.has_order_for_pair_on_date(pair, today_iso):
+                quota_pairs.append(pair)
+    else:
+        if is_eod_summary_time(now_bkk):
+            quota_pairs = list(PAIRS)
+
+    if mode == "auto":
+        if not (near_pairs or is_eod_summary_time(now_bkk) or quota_pairs):
+            print("⏭️ Not near (High/Medium) window, not EOD, and no quota pairs. Early exit.")
+            return
+
+    # 2) Decide target pairs
+    pairs_to_process = list(PAIRS) if mode == "force" else list(dict.fromkeys(near_pairs + quota_pairs))
+    if not pairs_to_process:
+        print("ℹ️ No pairs to process in this run.")
+        return
+
+    fetcher  = IQDataFetcher()
+    notifier = TelegramNotifier(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
+    oa       = _openai_client()
+    # Typhoon is formatter only (optional):
+    typhoon  = TyphoonForexAnalyzer(os.getenv("TYPHOON_API_KEY", ""))
+    typhoon_ready = False
+    if typhoon:
+        is_cfg = getattr(typhoon, "is_configured", None)
+        if callable(is_cfg):
+            typhoon_ready = bool(is_cfg())
+
+    # 3) Build a compact news payload for context (cap size)
     recent_news = []
     for ev in events_7[:60]:
         dt_iso = _parse_ff_time_to_bkk_iso(ev.get("date_label", ""), ev.get("Time", ""))
         recent_news.append({
-            "event_id": ev.get("event_id", ""), "title": ev.get("Event", ""), "currency": ev.get("Currency", ""),
-            "impact": ev.get("Impact", ""), "actual": ev.get("Actual", ""), "forecast": ev.get("Forecast", ""),
-            "previous": ev.get("Previous", ""), "time_iso": dt_iso
+            "event_id": ev.get("event_id", ""),
+            "title": ev.get("Event", ""),
+            "currency": ev.get("Currency", ""),
+            "impact": ev.get("Impact", ""),
+            "actual": ev.get("Actual", ""),
+            "forecast": ev.get("Forecast", ""),
+            "previous": ev.get("Previous", ""),
+            "time_iso": dt_iso
         })
 
-    profile = get_day_profile(now_bkk, cfg)
+    accepted_msgs: List[str] = []
+    rejected_pairs: List[Tuple[str, str]] = []  # (pair, reason)
 
-    # Decide pairs to process
-    pairs_to_process = list(PAIRS)
-    if mode == "auto":
-        filtered = []
-        for pair in PAIRS:
-            pair_times = filter_news_times_for_pair(high_impact_bkk, events_7, pair)
-            if within_news_window(now_bkk, pair_times, window_min=20) or is_eod_summary_time(now_bkk):
-                filtered.append(pair)
-        quota_pairs = [p for p in PAIRS if not ledger.has_order_for_pair_on_date(p, today_iso)]
-
-        if filtered or is_eod_summary_time(now_bkk) or quota_pairs:
-            pairs_to_process = list(dict.fromkeys(filtered + quota_pairs))
-        else:
-            print("⏭️ Not near high-impact news window; not EOD; all pairs already have daily order. Early exit.")
-            return
-
-    accepted_msgs, rejected_pairs = [], []
-
+    # 4) Per-pair loop
     for pair in pairs_to_process:
-        # Indicators (H1 + spot)
-        ind  = fetcher.get_indicators(pair, timeframe="H1", lookback=200)
-        spot = ind["spot"]
-
-        # ATR guidance (optional but useful)
+        print(f"\n--- Processing: {pair} ---")
+        # Indicators (H1) & spot
         try:
-            tech = fetcher.get_technical_data(pair)
-            d1_atr14 = float(tech.get("d1_atr14", 0.0)) or 0.0
-            d1_adr20 = float(tech.get("d1_adr20", 0.0)) or 0.0
-        except Exception:
-            d1_atr14, d1_adr20 = 0.0, 0.0
-
-        plans_quota = max(1, int(profile.get("plans_per_pair", 1)))
-        existing_cnt = ledger.count_orders_for_pair_on_date(pair, today_iso)
-        remaining = max(0, plans_quota - existing_cnt)
-        if remaining == 0:  # quota already satisfied
+            ind  = fetcher.get_indicators(pair, timeframe="H1", lookback=200)
+            spot = float(ind["spot"])
+        except Exception as e:
+            print(f"❌ Could not fetch indicators for {pair}: {e}")
+            rejected_pairs.append((pair, "indicator_fetch_failed"))
             continue
 
-        for variant_idx in range(remaining):
-            ctx = {
-                "pair": pair,
-                "tif_date": (now_bkk.date()).isoformat(),
-                "recent_news": recent_news,
-                "indicators": {"H1": ind["H1"], "spot": spot},
-                "source": {"news_ids": [e.get("event_id") for e in recent_news if e.get("event_id")],
-                           "indicators": {"H1": ind["H1"]}},
-                "rr_min": cfg.rr_min, "rr_max": cfg.rr_max, "prefer_rr": cfg.prefer_rr,
-                "weekday_name": ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][profile["weekday"]],
-                "tp_atr_low":  profile["tp_atr_mult"][0], "tp_atr_high": profile["tp_atr_mult"][1],
-                "weekly_target_pips": cfg.weekly_target_pips, "pairs_per_week": cfg.pairs_per_week,
-                "d1_atr14": d1_atr14, "d1_adr20": d1_adr20, "variant_idx": variant_idx,
-            }
+        ctx = {
+            "pair": pair,
+            "tif_date": (now_bkk.date()).isoformat(),
+            "recent_news": recent_news,
+            "indicators": {"H1": ind["H1"], "spot": spot},
+            "source": {"news_ids": [e.get("event_id") for e in recent_news if e.get("event_id")],
+                       "indicators": {"H1": ind["H1"]}},
+            "rr_min": cfg.rr_min,
+            "rr_max": cfg.rr_max,
+            "prefer_rr": cfg.prefer_rr,
+            # --- FINAL FIX: Add the specific buffer pips for this pair directly into the prompt context ---
+            "min_buffer_pips": cfg.buffer_pips(pair)
+        }
+
+        # 4.1 GPT → plan text
+        model_text = None
+        try:
             user_prompt = format_user_prompt(ctx)
-            user_prompt += (
-                f"\n\n# Day Profile\n"
-                f"Today: {ctx['weekday_name']}\n"
-                f"- Target TP width ≈ ATR*{ctx['tp_atr_low']:.2f}–ATR*{ctx['tp_atr_high']:.2f} (guideline; keep RR within [{cfg.rr_min},{cfg.rr_max}])\n"
-                f"- Weekly objective: ≥{cfg.weekly_target_pips} net pips across {cfg.pairs_per_week} pairs.\n"
-                f"- Variant index: {variant_idx} (avoid overlapping with earlier variants today; small nudge ≈0.25*ATR allowed)\n"
+            resp = client.responses.create(
+                model="gpt-5-mini",
+                instructions=SYSTEM_PROMPT,   # keep static for prompt caching
+                input=user_prompt,
+                text={"verbosity": "medium"},
+                reasoning={"effort": "minimal"},
+                max_output_tokens=1200
             )
+            model_text = resp.output_text
+            # --- DEBUG: Print raw model output ---
+            print(f"--- Raw Model Output for {pair} ---\n{model_text}\n------------------------------------")
+        except Exception as e:
+            model_text = None
+            print(f"❌ OpenAI API call failed for {pair}: {e}")
 
-            # Primary model
+        # 4.2 Parse & policy checks
+        plan: Optional[OCOPlan] = None
+        if model_text:
             try:
-                resp = oa.chat.completions.create(
-                    model=MODEL_ID,
-                    messages=[{"role":"system","content":SYSTEM_PROMPT},
-                              {"role":"user","content":user_prompt}],
-                    temperature=0.1, max_tokens=900,
-                )
-                text = resp.choices[0].message.content
-            except Exception:
-                text = None
+                plan = parse_model_output_to_plan(model_text, pair, ctx, cfg)
+            except Exception as e:
+                # --- DEBUG: Catch and print specific parsing error ---
+                print(f"❌ Error parsing model output for {pair}: {e}")
+                plan = None # Ensure plan is None on failure
 
-            plan: Optional[OCOPlan] = None
-            if text:
-                try:
-                    plan = parse_model_output_to_plan(text, pair, ctx, cfg)
-                except Exception:
-                    plan = None
+        # 4.3 If no valid plan → reject with reason
+        if plan is None or plan.decision == "reject":
+            reason = "model_parse_failed"
+            if plan is not None and getattr(plan, "reason", ""):
+                reason = plan.reason
+            # --- DEBUG: More specific reason if parsing itself failed ---
+            elif plan is None:
+                reason = "model_parse_exception"
+            rejected_pairs.append((pair, reason))
+            print(f"➡️ Rejected {pair} due to: {reason}")
+            continue
 
-            # Optional fallback
-            if (plan is None or plan.decision == "reject") and TYPHOON_API_KEY:
-                try:
-                    typhoon = _typhoon_client()
-                    alt_text = typhoon.chat(SYSTEM_PROMPT, user_prompt)
-                    plan = parse_model_output_to_plan(alt_text, pair, ctx, cfg)
-                except Exception:
-                    pass
+        # 4.4 Deterministic JSON
+        plan_obj = plan_to_deterministic_json(plan)
+        plan_obj.setdefault("source", {}).setdefault("indicators", {})["spot"] = spot
 
-            if plan is None:
-                rejected_pairs.append(pair)
-                continue
+        # 4.5 Optional: reprice pending limit legs closer (policy-safe)
+        plan_obj = maybe_reprice_pending(plan_obj, spot, cfg)
 
-            plan_obj = plan_to_deterministic_json(plan)
-            plan_obj.setdefault("source", {}).setdefault("indicators", {})["spot"] = spot
-            plan_obj["variant_idx"] = variant_idx
-            plan_obj["day_profile"] = {"weekday": profile["weekday"], "tp_atr_mult": profile["tp_atr_mult"], "plans_quota": plans_quota}
+        # 4.6 Persist
+        ledger.append_or_update(plan_obj)
 
-            # Reprice pending (Limit legs only)
-            plan_obj = maybe_reprice_pending(plan_obj, spot, cfg)
+        # 4.7 Status mark using H1 bars
+        h1_bars = fetcher.get_bars(pair, timeframe="H1", lookback=cfg.h1_lookback)
+        ledger.mark_statuses(pair, h1_bars, cfg)
 
-            # Persist
-            ledger.append_or_update(plan_obj)
-
-            # Mark statuses via H1 bars
-            h1_bars = fetcher.get_bars(pair, timeframe="H1", lookback=cfg.h1_lookback)
-            ledger.mark_statuses(pair, h1_bars, cfg)
-
-            if plan_obj["decision"] == "accept":
-                msg = (
-                    f"✅ {pair} [{ctx['weekday_name']} v{variant_idx}]\n"
-                    f"Combo: {plan_obj['oco_combo']}\n"
-                    f"Conf: {plan_obj['confidence']}\n"
-                    f"Reason: {plan_obj['reason']}\n"
-                    "Orders:\n" +
-                    "\n".join([f"- {o['type']} @ {o['entry']} | SL {o['sl']} | TP {o['tp']} | RR {o['rr']}" for o in plan_obj["orders"]])
-                )
-                accepted_msgs.append(msg)
+        # 4.8 Notify → Typhoon summary (formatter only) or fallback local summary
+        try:
+            summary_msg = ""
+            if typhoon_ready:
+                summary_msg = typhoon.summarize_plan(plan_obj, market_meta={"spot": spot, "tf": "H1"})
             else:
-                rejected_pairs.append(pair)
+                # local minimal summary (guaranteed no LLM drift)
+                summary_msg = (
+                    f"✅ {plan_obj['pair']} | {plan_obj['decision'].upper()}\n"
+                    f"Combo: {', '.join(plan_obj['oco_combo'])}\n"
+                    f"Conf: {plan_obj['confidence']:.2f} | Reason: {plan_obj['reason']}\n"
+                    "Orders:\n" + "\n".join(
+                        f"- {o['type']} @ {o['entry']} | SL {o['sl']} | TP {o['tp']} | RR {o['rr']}"
+                        for o in plan_obj["orders"]
+                    )
+                )
 
-    # Notify
-    if accepted_msgs:
-        notifier.send_message("📌 Accepted OCO Plans\n" + "\n\n".join(accepted_msgs))
+            if not dry_run:
+                notifier.send_message(summary_msg)
+            print(f"✅ Notified acceptance for {pair}")
+            accepted_msgs.append(pair)
+        except Exception as e:
+            print(f"❌ Notification failed for {pair}: {e}")
+            # If sending failed, at least note the acceptance in a compact line
+            accepted_msgs.append(f"{pair} (send_failed)")
+
+
+    # 5) Post-run notifications
     if rejected_pairs:
-        notifier.send_message("ℹ️ Rejected pairs this run: " + ", ".join(sorted(set(rejected_pairs))))
+        lines = ["ℹ️ Rejected this run:"]
+        for p, r in rejected_pairs:
+            lines.append(f"- {p} → {r}")
+        if not dry_run:
+            notifier.send_message("\n".join(lines))
 
-    # EOD summary
+    # 6) EOD summary (once/day)
     if is_eod_summary_time(now_bkk):
         entries = ledger.list_entries()
-        lines = [f"{e['pair']} | {e['status']} | {e['oco_combo']} | conf={e['confidence']} | created={e['created_at']}" for e in entries]
+        lines = [
+            f"{e['pair']} | {e['status']} | {e['oco_combo']} | conf={e['confidence']} | created={e['created_at']}"
+            for e in entries
+        ]
         log_today_summary_only("📒 End-of-day summary\n" + "\n".join(lines))
 
+    fetcher.close_connection() # ensure connection is closed
+    print("\n--- Run finished ---")
 
-# ---------- CLI ----------
+
+# --------------------- CLI ---------------------
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["auto", "force"], default="auto",
-                        help="auto: near-news/EOD or daily-quota; force: run immediately")
+                        help="auto: near (High/Medium) news / EOD / daily-quota; force: run immediately")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Run all logic but do not send Telegram messages.")
     args = parser.parse_args()
-    run_once(mode=args.mode, dry_run=False)
+    run_once(mode=args.mode, dry_run=args.dry_run)

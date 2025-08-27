@@ -4,7 +4,6 @@ on:
   # Hourly for 06:00–18:00 Asia/Bangkok (UTC+7) → 23:00–11:00 UTC
   schedule:
     - cron: "*/30 * * * *"   # ทุกครึ่งชั่วโมงทั้งวัน
-    - cron: "59 13 * * *"    # 20:59 BKK (13:59 UTC) EOD summary
   workflow_dispatch: {}
 
 # allow pushing changes back to the repo

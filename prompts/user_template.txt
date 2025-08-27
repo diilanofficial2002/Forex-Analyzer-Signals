@@ -11,6 +11,7 @@ TIF_DATE: {tif_date}
 RR_MIN: {rr_min}
 RR_MAX: {rr_max}
 PREFER_RR: {prefer_rr}
+MIN_BUFFER_PIPS: {min_buffer_pips}
 
 # Task
 Given the above, propose a single OCO plan using ONLY the allowed combos, respecting pending semantics and TP/SL realism vs ATR/ADR and spread.
