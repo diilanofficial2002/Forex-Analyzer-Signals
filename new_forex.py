@@ -396,7 +396,7 @@ def run_once():
             "tif_date": tif_date,
             "rr_min": cfg.rr_min,
             "rr_max": cfg.rr_max,
-            "allowed_combos": "BUY_STOP+SELL_STOP | BUY_LIMIT+BUY_STOP | SELL_LIMIT+SELL_STOP",
+            "allowed_combos": "BUY_STOP+SELL_STOP | BUY_LIMIT+BUY_STOP | SELL_LIMIT+SELL_STOP | SELL_LIMIT+BUT_LIMIT",
         }
         user_prompt = build_user_prompt(ctx)
 

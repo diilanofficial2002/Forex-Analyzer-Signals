@@ -5,6 +5,7 @@ Strict requirements:
   1) BUY_STOP + SELL_STOP
   2) BUY_LIMIT + BUY_STOP
   3) SELL_LIMIT + SELL_STOP
+  4) SELL_LIMIT + BUY_LIMIT
 - Enforce Risk:Reward within [1.5, 2.0]. Prefer ≥1.8.
 - Respect Time-In-Force by weekday (Mon≤5d ... Fri=1d); you will be given TIF explicitly.
 - Keep plans executable and realistic vs spot and spread.
@@ -12,7 +13,7 @@ Strict requirements:
 - Output MUST follow the exact markdown below for parser compatibility.
 
 Output format (exactly):
-**COMBO:** <BUY_STOP+SELL_STOP | BUY_LIMIT+BUY_STOP | SELL_LIMIT+SELL_STOP>
+**COMBO:** <BUY_STOP+SELL_STOP | BUY_LIMIT+BUY_STOP | SELL_LIMIT+SELL_STOP | SELL_LIMIT + BUY_LIMIT>
 **TIF:** <YYYY-MM-DD>
 **PRIMARY ORDER:** <LONG|SHORT> — <Buy Stop|Sell Stop|Buy Limit|Sell Limit> @ <entry_price>
 **TP:** <price>
