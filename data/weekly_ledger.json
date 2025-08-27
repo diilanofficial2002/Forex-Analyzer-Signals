@@ -200,17 +200,17 @@
       "orders": [
         {
           "type": "Sell Limit",
-          "entry": 0.86283,
-          "sl": 0.8643,
-          "tp": 0.8607,
-          "rr": 1.45
+          "entry": 0.86275,
+          "sl": 0.8644,
+          "tp": 0.8614,
+          "rr": 0.82
         },
         {
           "type": "Buy Limit",
-          "entry": 0.86183,
-          "sl": 0.8597,
-          "tp": 0.8637,
-          "rr": 0.88
+          "entry": 0.86175,
+          "sl": 0.8601,
+          "tp": 0.8633,
+          "rr": 0.94
         }
       ],
       "time_in_force": {
@@ -218,9 +218,9 @@
         "expires_at": "2025-08-28T00:00:00Z"
       },
       "status": "triggered",
-      "confidence": 0.62,
+      "confidence": 0.72,
       "created_at": "2025-08-27T00:00:00Z",
-      "updated_at": "2025-08-27T21:19:28Z",
+      "updated_at": "2025-08-27T21:36:18Z",
       "source": {
         "news_ids": [
           "142977",
@@ -229,15 +229,15 @@
         ],
         "indicators": {
           "H1": {
-            "ema_fast": 0.8625160229977039,
-            "ema_slow": 0.8633867029074904,
-            "rsi": 45.55728354748013
+            "ema_fast": 0.8625082957249767,
+            "ema_slow": 0.8633836671932047,
+            "rsi": 44.632691898892126
           },
-          "spot": 0.86233
+          "spot": 0.86225
         }
       },
       "decision": "accept",
-      "reason": "Market shows neutral-to-slightly-bearish H1 structure: ema_fast (0.862516) below ema_slow (0.863387) with small spread and RSI ~45 \u2014 no strong trend; recent EUR news low-impact and no major EUR/GBP-specific catalysts. Therefore a reversal/pullback OCO (SELL_LIMIT + BUY_LIMIT) to capture mean reversion at nearby resistance/support is appropriate. | repriced closer"
+      "reason": "Market shows range/mean-reverting signals: H1 EMA fast (0.862508) is slightly below EMA slow (0.863384) with minimal separation and RSI ~44.6 (neutral-to-mildly-oversold). No strong trending momentum and dominant news are not EUR/GBP-specific high-impact. Therefore use a reversal/pullback OCO (SELL_LIMIT + BUY_LIMIT) to capture bounce from nearby S/R levels. | repriced closer"
     },
     {
       "pair": "EUR/CHF",
@@ -248,17 +248,17 @@
       "orders": [
         {
           "type": "Sell Limit",
-          "entry": 0.93438,
-          "sl": 0.937,
-          "tp": 0.932,
-          "rr": 0.91
+          "entry": 0.93432,
+          "sl": 0.9372,
+          "tp": 0.9325,
+          "rr": 0.63
         },
         {
           "type": "Buy Limit",
-          "entry": 0.93338,
-          "sl": 0.9305,
-          "tp": 0.935,
-          "rr": 0.56
+          "entry": 0.93332,
+          "sl": 0.9298,
+          "tp": 0.9345,
+          "rr": 0.34
         }
       ],
       "time_in_force": {
@@ -266,26 +266,27 @@
         "expires_at": "2025-08-28T00:00:00Z"
       },
       "status": "triggered",
-      "confidence": 0.65,
+      "confidence": 0.72,
       "created_at": "2025-08-27T00:00:00Z",
-      "updated_at": "2025-08-27T21:19:43Z",
+      "updated_at": "2025-08-27T21:36:31Z",
       "source": {
         "news_ids": [
           "140827",
           "142977",
-          "142978"
+          "142978",
+          "142951"
         ],
         "indicators": {
           "H1": {
-            "ema_fast": 0.9342028774319335,
-            "ema_slow": 0.9355489472077315,
-            "rsi": 44.18537332721964
+            "ema_fast": 0.934197422886479,
+            "ema_slow": 0.9355468043505887,
+            "rsi": 43.630382414493404
           },
-          "spot": 0.93388
+          "spot": 0.93382
         }
       },
       "decision": "accept",
-      "reason": "Market shows slight bearish structure on H1 (ema_fast 0.93420 < ema_slow 0.93555) with RSI ~44 (neutral/slightly below center) \u2014 not strongly trending but biased lower; no immediate high-impact EUR/CHF news, upcoming CHF GDP (medium) could trigger volatility. Choose a reversal/pullback OCO (SELL_LIMIT + BUY_LIMIT) to capture mean reversion off current spot within range, respecting buffers. | repriced closer"
+      "reason": "Market shows slight bearish bias on H1 (ema_fast 0.93420 < ema_slow 0.93555) with RSI ~43 (neutral-to-mildly-oversold), no strong trending momentum and upcoming CHF GDP (medium impact) plus several EUR/CHF-relevant low-impact EUR events \u2014 favors a reversal/pullback OCO to capture mean-reversion off current spot. | repriced closer"
     },
     {
       "pair": "GBP/USD",
@@ -338,23 +339,23 @@
     {
       "pair": "USD/JPY",
       "oco_combo": [
-        "Buy Stop",
-        "Sell Stop"
+        "Sell Limit",
+        "Buy Limit"
       ],
       "orders": [
         {
-          "type": "Buy Stop",
-          "entry": 147.997,
-          "sl": 147.497,
-          "tp": 148.497,
-          "rr": 1.0
+          "type": "Sell Limit",
+          "entry": 147.915,
+          "sl": 148.375,
+          "tp": 147.3,
+          "rr": 1.34
         },
         {
-          "type": "Sell Stop",
-          "entry": 146.777,
-          "sl": 147.277,
-          "tp": 145.777,
-          "rr": 2.0
+          "type": "Buy Limit",
+          "entry": 146.715,
+          "sl": 146.255,
+          "tp": 147.24,
+          "rr": 1.14
         }
       ],
       "time_in_force": {
@@ -362,9 +363,9 @@
         "expires_at": "2025-08-28T00:00:00Z"
       },
       "status": "triggered",
-      "confidence": 0.62,
+      "confidence": 0.68,
       "created_at": "2025-08-27T00:00:00Z",
-      "updated_at": "2025-08-27T17:12:55Z",
+      "updated_at": "2025-08-27T21:36:03Z",
       "source": {
         "news_ids": [
           "142559",
@@ -373,15 +374,15 @@
         ],
         "indicators": {
           "H1": {
-            "ema_fast": 147.7388172785195,
-            "ema_slow": 147.67170951123984,
-            "rsi": 37.23343127413388
+            "ema_fast": 147.6300137550312,
+            "ema_slow": 147.63483808406968,
+            "rsi": 36.957950522850496
           },
-          "spot": 147.377
+          "spot": 147.315
         }
       },
       "decision": "accept",
-      "reason": "H1 shows mild bullish EMA alignment (ema_fast 147.738 > ema_slow 147.672) but price is below both (spot 147.377) and RSI 37 indicates mild bearish/mean-revert bias; upcoming high-impact USD data (Prelim GDP, Unemployment Claims) increases breakout risk. Given mixed structure (weak trend + significant news), choose a Breakout strategy to capture directional move while respecting buffers."
+      "reason": "H1 shows flat/weak bearish structure: ema_fast (147.6300) slightly below ema_slow (147.6348) and RSI ~37 (near oversold) \u2014 no strong trending momentum. Upcoming high-impact USD data (Prelim GDP, Unemployment Claims) could trigger volatility, but current structure favors mean-reversion/pullback setup. Therefore choose reversal/pullback OCO (SELL_LIMIT + BUY_LIMIT) to capture bounces off resistance/support around spot with buffers. | repriced closer"
     },
     {
       "pair": "EUR/USD",
@@ -392,27 +393,27 @@
       "orders": [
         {
           "type": "Sell Limit",
-          "entry": 1.16384,
-          "sl": 1.16734,
-          "tp": 1.16084,
-          "rr": 0.86
+          "entry": 1.16431,
+          "sl": 1.1683,
+          "tp": 1.1618,
+          "rr": 0.63
         },
         {
           "type": "Buy Limit",
-          "entry": 1.16284,
-          "sl": 1.15984,
-          "tp": 1.16584,
-          "rr": 1.0
+          "entry": 1.16331,
+          "sl": 1.1583,
+          "tp": 1.16505,
+          "rr": 0.35
         }
       ],
       "time_in_force": {
         "type": "weekly",
-        "expires_at": "2025-08-28T23:59:59Z"
+        "expires_at": "2025-08-28T00:00:00Z"
       },
       "status": "triggered",
-      "confidence": 0.72,
+      "confidence": 0.68,
       "created_at": "2025-08-27T00:00:00Z",
-      "updated_at": "2025-08-27T20:15:09Z",
+      "updated_at": "2025-08-27T21:35:35Z",
       "source": {
         "news_ids": [
           "142559",
@@ -420,15 +421,15 @@
         ],
         "indicators": {
           "H1": {
-            "ema_fast": 1.1619833860493118,
-            "ema_slow": 1.1630585931471618,
-            "rsi": 55.88601450287093
+            "ema_fast": 1.1621907641802092,
+            "ema_slow": 1.1631028324634025,
+            "rsi": 57.706759794145704
           },
-          "spot": 1.16334
+          "spot": 1.16381
         }
       },
       "decision": "accept",
-      "reason": "Market shows neutral/slightly bearish EMAs (ema_fast 1.16198 < ema_slow 1.16306) with RSI ~56 (not extreme) and spot 1.16334 near EMAs -> range/pullback conditions. No dominant momentum signals but high-impact USD data upcoming (Prelim GDP, Unemployment Claims) favor placing reversal/pullback OCO to capture mean reversion around current structure. | repriced closer"
+      "reason": "Price near 1.16381 with H1 EMAs slightly bearish (ema_fast 1.16219 < ema_slow 1.16310) but very close together and RSI 57.7 in neutral-to-mildly-bullish range; market shows no strong trending momentum. Upcoming high-impact USD GDP and Unemployment Claims could trigger range expansion but current structure favors mean-reversion off nearby resistance/support. Therefore choose a reversal/pullback OCO (SELL_LIMIT + BUY_LIMIT) to capture bounces from short-term supply/demand levels while limiting exposure to breakout noise. | repriced closer"
     },
     {
       "pair": "EUR/USD",
@@ -487,17 +488,17 @@
       "orders": [
         {
           "type": "Buy Stop",
-          "entry": 1.351,
-          "sl": 1.3485,
-          "tp": 1.357,
-          "rr": 2.4
+          "entry": 1.3512,
+          "sl": 1.3486,
+          "tp": 1.356,
+          "rr": 1.85
         },
         {
           "type": "Sell Stop",
-          "entry": 1.347,
-          "sl": 1.3505,
-          "tp": 1.341,
-          "rr": 1.71
+          "entry": 1.3478,
+          "sl": 1.3504,
+          "tp": 1.3424,
+          "rr": 2.08
         }
       ],
       "time_in_force": {
@@ -507,24 +508,23 @@
       "status": "triggered",
       "confidence": 0.72,
       "created_at": "2025-08-27T12:00:00Z",
-      "updated_at": "2025-08-27T21:19:08Z",
+      "updated_at": "2025-08-27T21:35:51Z",
       "source": {
         "news_ids": [
           "142559",
-          "141464",
-          "142563"
+          "141464"
         ],
         "indicators": {
           "H1": {
-            "ema_fast": 1.3474150613706846,
-            "ema_slow": 1.3471340961879419,
-            "rsi": 61.76147363552182
+            "ema_fast": 1.3474350613706847,
+            "ema_slow": 1.3471419533307991,
+            "rsi": 63.15844536784518
           },
-          "spot": 1.34948
+          "spot": 1.3497
         }
       },
       "decision": "accept",
-      "reason": "H1 shows mild bullish momentum: ema_fast (1.347415) > ema_slow (1.347134) with small separation and RSI ~61.8 (bullish but not overbought). Upcoming high-impact USD data (Prelim GDP, Unemployment Claims) could trigger directional breakout. Prefer breakout strategy to capture continuation around news and momentum."
+      "reason": "H1 shows slight bullish bias: ema_fast (1.347435) > ema_slow (1.347142) and RSI 63 suggests momentum but not overbought; upcoming high-impact US data (Prelim GDP, Unemployment Claims) could trigger continuation breakouts. Choose breakout strategy (BUY_STOP + SELL_STOP) to capture directional break on volatility spike."
     }
   ]
 }
