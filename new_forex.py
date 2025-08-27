@@ -282,7 +282,7 @@ def build_system_prompt_gpt5() -> str:
         "**TP:** <price>\n**SL:** <price>\n"
         "**SECONDARY (OCO):** <LONG|SHORT> — <Buy Stop|Sell Stop|Buy Limit|Sell Limit> @ <entry>\n"
         "**TP:** <price>\n**SL:** <price>\n"
-        "- 3–6 short bullets of reasons."
+        "- 3-6 short bullets of reasons."
     )
     return _load_text_or_default("prompts/system_gpt5.txt", default)
 
@@ -439,7 +439,7 @@ def run_once():
         else:
             rejected_pairs.append(pair)
 
-    # 4) Daily review (Tue–Fri)
+    # 4) Daily review (Tue-Fri)
     if weekday_bkk in (1, 2, 3, 4):
         total_active = ledger.count_active()
         if total_active == 0:

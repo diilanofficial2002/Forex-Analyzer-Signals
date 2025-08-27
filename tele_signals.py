@@ -10,6 +10,9 @@ def log_today(message: str, filename: str = "data/daily_log.txt"):
     Append message into a daily file; overwrite if the date header has changed.
     """
     os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with open(filename, 'w') as file:
+        file.write('') 
+        
     today_str = date.today().isoformat()
     if not os.path.exists(filename):
         with open(filename, "w", encoding="utf-8") as f:
