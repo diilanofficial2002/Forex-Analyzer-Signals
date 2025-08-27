@@ -3,19 +3,8 @@ name: Forex Pending-Order Bot
 on:
   # Hourly for 06:00–18:00 Asia/Bangkok (UTC+7) → 23:00–11:00 UTC
   schedule:
-    - cron: "0 23 * * *"
-    - cron: "0 0 * * *"
-    - cron: "0 1 * * *"
-    - cron: "0 2 * * *"
-    - cron: "0 3 * * *"
-    - cron: "0 4 * * *"
-    - cron: "0 5 * * *"
-    - cron: "0 6 * * *"
-    - cron: "0 7 * * *"
-    - cron: "0 8 * * *"
-    - cron: "0 9 * * *"
-    - cron: "0 10 * * *"
-    - cron: "0 11 * * *"
+    - cron: "*/30 * * * *"   # ทุกครึ่งชั่วโมงทั้งวัน
+    - cron: "59 13 * * *"    # 20:59 BKK (13:59 UTC) EOD summary
   workflow_dispatch: {}
 
 # allow pushing changes back to the repo
@@ -38,7 +27,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       TYPHOON_API_KEY: ${{ secrets.TYPHOON_API_KEY }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      CHAT_ID: ${{ secrets.CHAT_ID }}
+      TELEGRAM_CHAT_ID: ${{ secrets.CHAT_ID }}
       IQ_USER: ${{ secrets.IQ_USER }}
       IQ_PASS: ${{ secrets.IQ_PASS }}
 
@@ -80,12 +69,11 @@ jobs:
 
       - name: Install Playwright (Chromium) + system deps
         run: |
-          python -m playwright install chromium
-          python -m playwright install-deps chromium || true
+          python -m playwright install --with-deps chromium
 
       - name: Run bot (one shot)
         run: |
-          python new_forex.py
+          python new_forex.py --mode auto
 
       - name: Commit & push changes in data/ (if any)
         if: always()

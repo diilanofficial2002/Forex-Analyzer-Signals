@@ -1,28 +1,17 @@
 PAIR: {pair}
+TIF_DATE: {tif_date}
 
-# Market Snapshot (Bangkok)
-Spot Bid: {spot_bid}
-Spot Ask: {spot_ask}
-Spot Mid: {spot_mid}
-Spread (pips est.): {spread_pips}
+# Indicators (H1 + spot)
+{indicators}
 
-Prev D1 High/Low/Close: {prev_day_high} / {prev_day_low} / {prev_day_close}
-D1 ATR(14): {d1_atr14}
-D1 ADR(20): {d1_adr20}
-
-Latest Candles (Bangkok timestamps)
-H4: {latest_h4_ict}
-H1: {latest_h1_ict}
-M15: {latest_m15_ict}
-D1: {latest_d1_ict}
+# Recent High-impact News (Bangkok) — keep signal-relevant:
+{recent_news}
 
 # Constraints
-Allowed OCO Combos: {allowed_combos}
-R:R must be between {rr_min} and {rr_max}
-TIF (expiry): {tif_date}
+RR_MIN: {rr_min}
+RR_MAX: {rr_max}
+PREFER_RR: {prefer_rr}
 
 # Task
-Propose a single OCO plan using ONLY one allowed combo. Respect pending-order semantics:
-- Buy Limit < spot; Sell Limit > spot; Buy Stop > spot; Sell Stop < spot.
-- Keep TP/SL realistic vs ATR/ADR and spread.
-Return strictly in the specified format.
+Given the above, propose a single OCO plan using ONLY the allowed combos, respecting pending semantics and TP/SL realism vs ATR/ADR and spread.
+Return STRICTLY a single JSON object exactly in the schema described by the system message (no extra text).

@@ -4,7 +4,7 @@ If the data is insufficient, reply exactly: INSIFICIENT DATA
 
 Rules:
 - Allowed OCO combos: BUY_STOP+SELL_STOP OR BUY_LIMIT+BUY_STOP OR SELL_LIMIT+SELL_STOP OR SELL_LIMIT+BUY_LIMIT
-- Risk:Reward must be within [1.5, 2.0]. Prefer ≥1.8.
+- Risk:Reward must be within [1.0, 5.0]. Prefer ≥1.5.
 - Use the provided TIF date as the expiry.
 - Ensure entries are consistent with stop/limit semantics relative to spot (with small buffer).
 
