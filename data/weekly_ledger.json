@@ -1,0 +1,148 @@
+{
+  "week": "2025-35",
+  "orders": [
+    {
+      "pair": "EUR/USD",
+      "oco_combo": [
+        "Sell Limit",
+        "Buy Limit"
+      ],
+      "orders": [
+        {
+          "type": "Sell Limit",
+          "entry": 1.15971,
+          "sl": 1.165,
+          "tp": 1.1545,
+          "rr": 0.98
+        },
+        {
+          "type": "Buy Limit",
+          "entry": 1.15871,
+          "sl": 1.152,
+          "tp": 1.163,
+          "rr": 0.64
+        }
+      ],
+      "time_in_force": {
+        "type": "weekly",
+        "expires_at": "2025-08-27T00:00:00Z"
+      },
+      "status": "triggered",
+      "confidence": 0.68,
+      "created_at": "2025-08-20T12:00:00Z",
+      "updated_at": "2025-08-27T09:15:40Z",
+      "source": {
+        "news_ids": [
+          "146405",
+          "144745",
+          "144088",
+          "142283"
+        ],
+        "indicators": {
+          "H1": {
+            "ema_fast": 1.1624485433221563,
+            "ema_slow": 1.163887783620524,
+            "rsi": 29.444262862749984
+          },
+          "spot": 1.15921
+        }
+      },
+      "decision": "accept",
+      "reason": "H1 shows bearish bias: ema_fast (1.16245) below ema_slow (1.16389) and RSI ~29 (oversold but still weak trend). Spot 1.15921 with EMAs above spot indicates continuation pressure down but RSI near oversold suggests possible pullback. Choose a reversal/pullback OCO (SELL_LIMIT + BUY_LIMIT) to capture mean-revert into EMAs or continuation rejection at resistance/support levels. | repriced closer"
+    },
+    {
+      "pair": "EUR/GBP",
+      "oco_combo": [
+        "Sell Limit",
+        "Buy Limit"
+      ],
+      "orders": [
+        {
+          "type": "Sell Limit",
+          "entry": 0.8627,
+          "sl": 0.8654,
+          "tp": 0.8618,
+          "rr": 0.33
+        },
+        {
+          "type": "Buy Limit",
+          "entry": 0.8617,
+          "sl": 0.8598,
+          "tp": 0.8634,
+          "rr": 0.89
+        }
+      ],
+      "time_in_force": {
+        "type": "weekly",
+        "expires_at": "2025-08-27T00:00:00Z"
+      },
+      "status": "triggered",
+      "confidence": 0.68,
+      "created_at": "2025-08-26T12:00:00Z",
+      "updated_at": "2025-08-27T09:16:10Z",
+      "source": {
+        "news_ids": [
+          "142283",
+          "143434"
+        ],
+        "indicators": {
+          "H1": {
+            "ema_fast": 0.8634020118339361,
+            "ema_slow": 0.8640767203981908,
+            "rsi": 31.516559747820214
+          },
+          "spot": 0.8622
+        }
+      },
+      "decision": "accept",
+      "reason": "Reversal/pullback chosen: H1 shows ema_fast (0.86340) below ema_slow (0.86408) with small separation and RSI ~31.5 (near oversold) indicating range/mean-revert probability rather than strong trend. No high-impact EUR/GBP-specific news; select sell_limit + buy_limit to capture bounce/reversal at defined resistance/support. | repriced closer"
+    },
+    {
+      "pair": "EUR/CHF",
+      "oco_combo": [
+        "Sell Limit",
+        "Buy Limit"
+      ],
+      "orders": [
+        {
+          "type": "Sell Limit",
+          "entry": 0.93513,
+          "sl": 0.9373,
+          "tp": 0.9338,
+          "rr": 0.61
+        },
+        {
+          "type": "Buy Limit",
+          "entry": 0.93413,
+          "sl": 0.9312,
+          "tp": 0.9358,
+          "rr": 0.57
+        }
+      ],
+      "time_in_force": {
+        "type": "weekly",
+        "expires_at": "2025-08-27T23:59:00Z"
+      },
+      "status": "triggered",
+      "confidence": 0.72,
+      "created_at": "2025-08-20T12:00:00Z",
+      "updated_at": "2025-08-27T09:16:24Z",
+      "source": {
+        "news_ids": [
+          "142283",
+          "140807"
+        ],
+        "indicators": {
+          "H1": {
+            "ema_fast": 0.9356496647491855,
+            "ema_slow": 0.9366393444864707,
+            "rsi": 35.30841822328908
+          },
+          "spot": 0.93463
+        }
+      },
+      "decision": "accept",
+      "reason": "Market shows mild bearish bias but not strong trend: EMA_fast (0.93565) below EMA_slow (0.93664) and RSI ~35 (near oversold) indicating range/pullback potential rather than strong breakout. No EUR/CHF high-impact news. Choose reversal/pullback OCO (SELL_LIMIT + BUY_LIMIT) to capture rejects at resistance or bounces from support. | repriced closer"
+    }
+  ]
+}
