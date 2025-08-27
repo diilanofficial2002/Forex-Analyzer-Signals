@@ -380,6 +380,54 @@
       },
       "decision": "accept",
       "reason": "H1 shows bullish structure: ema_fast(147.717) > ema_slow(147.635) with widening gap and RSI ~64.7 (near bullish momentum) and recent USD news flow (low impact) \u2014 favors breakout strategy to capture continuation. Chosen breakout (BUY_STOP + SELL_STOP) with safety buffer 60 pips from spot (spot 148.018 => 60 pips = 0.600). Entries placed beyond buffers; risk/reward set ~1.5 within [1.25,5]."
+    },
+    {
+      "pair": "EUR/USD",
+      "oco_combo": [
+        "Buy Stop",
+        "Sell Stop"
+      ],
+      "orders": [
+        {
+          "type": "Buy Stop",
+          "entry": 1.16106,
+          "sl": 1.15806,
+          "tp": 1.16756,
+          "rr": 2.17
+        },
+        {
+          "type": "Sell Stop",
+          "entry": 1.15356,
+          "sl": 1.15756,
+          "tp": 1.14406,
+          "rr": 2.37
+        }
+      ],
+      "time_in_force": {
+        "type": "weekly",
+        "expires_at": "2025-08-27T23:59:59Z"
+      },
+      "status": "triggered",
+      "confidence": 0.76,
+      "created_at": "2025-08-27T00:00:00Z",
+      "updated_at": "2025-08-27T10:41:18Z",
+      "source": {
+        "news_ids": [
+          "146405",
+          "144088",
+          "143107"
+        ],
+        "indicators": {
+          "H1": {
+            "ema_fast": 1.162078551784171,
+            "ema_slow": 1.1636909776874556,
+            "rsi": 26.805640355063414
+          },
+          "spot": 1.15856
+        }
+      },
+      "decision": "accept",
+      "reason": "H1 shows bearish bias: ema_fast (1.16208) < ema_slow (1.16369) and RSI 26.8 (oversold) but strong short-term momentum downward from spot 1.15856 \u2014 favors breakout continuation to downside while allowing upside breakout contingency => choose Breakout strategy (BUY_STOP + SELL_STOP)."
     }
   ]
 }
