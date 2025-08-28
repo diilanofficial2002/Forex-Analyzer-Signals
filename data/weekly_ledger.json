@@ -484,43 +484,44 @@
       "orders": [
         {
           "type": "Buy Stop",
-          "entry": 1.3508,
-          "sl": 1.3478,
-          "tp": 1.3565,
-          "rr": 1.9
+          "entry": 1.3534,
+          "sl": 1.3509,
+          "tp": 1.3581,
+          "rr": 1.88
         },
         {
           "type": "Sell Stop",
-          "entry": 1.3496,
-          "sl": 1.3526,
-          "tp": 1.3439,
-          "rr": 1.9
+          "entry": 1.3498,
+          "sl": 1.3523,
+          "tp": 1.3448,
+          "rr": 2.0
         }
       ],
       "time_in_force": {
         "type": "weekly",
-        "expires_at": "2025-08-28T23:59:59Z"
+        "expires_at": "2025-08-28T00:00:00Z"
       },
       "status": "triggered",
-      "confidence": 0.68,
+      "confidence": 0.72,
       "created_at": "2025-08-27T12:00:00Z",
-      "updated_at": "2025-08-27T23:35:34Z",
+      "updated_at": "2025-08-28T11:38:08Z",
       "source": {
         "news_ids": [
           "142559",
-          "141464"
+          "141464",
+          "142563"
         ],
         "indicators": {
           "H1": {
-            "ema_fast": 1.3478893369716303,
-            "ema_slow": 1.347345987420996,
-            "rsi": 65.22452066075812
+            "ema_fast": 1.3498671888392781,
+            "ema_slow": 1.3485484973189164,
+            "rsi": 65.76150953007652
           },
-          "spot": 1.35019
+          "spot": 1.35184
         }
       },
       "decision": "accept",
-      "reason": "H1 shows mild bullish momentum: ema_fast (1.34789) > ema_slow (1.34735) and spreading, RSI ~65 (approaching overbought but still bullish). Upcoming high-impact USD GDP & Unemployment Claims may cause breakout moves. Therefore choose a breakout strategy to capture continuation (BUY_STOP + SELL_STOP). Entries respect 5-pip minimum buffer from spot (spot 1.35019)."
+      "reason": "H1 shows bullish structure: ema_fast (1.349867) > ema_slow (1.348548) and spreading, RSI ~65.8 (near bullish momentum). Upcoming high-impact USD data (Prelim GDP, Unemployment Claims) could trigger directional breakout. Choose breakout strategy to capture continuation."
     },
     {
       "pair": "EUR/USD",
@@ -719,17 +720,17 @@
       "orders": [
         {
           "type": "Sell Limit",
-          "entry": 147.749,
-          "sl": 148.34,
-          "tp": 147.14,
-          "rr": 1.03
+          "entry": 147.439,
+          "sl": 147.92,
+          "tp": 146.28,
+          "rr": 2.41
         },
         {
           "type": "Buy Limit",
-          "entry": 146.549,
-          "sl": 146.07,
-          "tp": 147.135,
-          "rr": 1.22
+          "entry": 146.239,
+          "sl": 145.76,
+          "tp": 147.26,
+          "rr": 2.13
         }
       ],
       "time_in_force": {
@@ -737,9 +738,9 @@
         "expires_at": "2025-08-28T23:59:59Z"
       },
       "status": "triggered",
-      "confidence": 0.62,
+      "confidence": 0.74,
       "created_at": "2025-08-28T08:00:00Z",
-      "updated_at": "2025-08-28T05:18:07Z",
+      "updated_at": "2025-08-28T11:38:21Z",
       "source": {
         "news_ids": [
           "142559",
@@ -748,15 +749,15 @@
         ],
         "indicators": {
           "H1": {
-            "ema_fast": 147.4175424020269,
-            "ema_slow": 147.53644883940024,
-            "rsi": 35.20374212169967
+            "ema_fast": 147.26528701449828,
+            "ema_slow": 147.44776483287302,
+            "rsi": 30.27334936724757
           },
-          "spot": 147.149
+          "spot": 146.839
         }
       },
       "decision": "accept",
-      "reason": "H1 shows mild bearish bias: ema_fast (147.4175) slightly below ema_slow (147.5364) and RSI ~35 (near oversold) but not extreme; market not strongly trending. High-impact US data imminent (Prelim GDP, Unemployment Claims) supports potential breakout but primary structure favors a mean-reversion / range-pocket with news risk. Chosen strategy: reversal/pullback (SELL_LIMIT + BUY_LIMIT) to capture bounces from current spot with safety buffers and balanced RR. | repriced closer"
+      "reason": "Reversal/pullback chosen: H1 shows ema_fast (147.265) below ema_slow (147.448) with narrow spread and RSI ~30.27 (near oversold) indicating range/mean-revert setup rather than strong trend. No USD high-impact news before expiry that would strongly bias breakout. Therefore use SELL_LIMIT + BUY_LIMIT to capture bounces/resets around current spot with symmetric buffers. | repriced closer"
     },
     {
       "pair": "EUR/CHF",
