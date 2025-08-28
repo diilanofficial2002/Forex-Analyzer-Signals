@@ -757,6 +757,55 @@
       },
       "decision": "accept",
       "reason": "H1 shows mild bearish bias: ema_fast (147.4175) slightly below ema_slow (147.5364) and RSI ~35 (near oversold) but not extreme; market not strongly trending. High-impact US data imminent (Prelim GDP, Unemployment Claims) supports potential breakout but primary structure favors a mean-reversion / range-pocket with news risk. Chosen strategy: reversal/pullback (SELL_LIMIT + BUY_LIMIT) to capture bounces from current spot with safety buffers and balanced RR. | repriced closer"
+    },
+    {
+      "pair": "EUR/CHF",
+      "oco_combo": [
+        "Sell Limit",
+        "Buy Limit"
+      ],
+      "orders": [
+        {
+          "type": "Sell Limit",
+          "entry": 0.93376,
+          "sl": 0.9355,
+          "tp": 0.932,
+          "rr": 1.01
+        },
+        {
+          "type": "Buy Limit",
+          "entry": 0.93276,
+          "sl": 0.9305,
+          "tp": 0.934,
+          "rr": 0.55
+        }
+      ],
+      "time_in_force": {
+        "type": "weekly",
+        "expires_at": "2025-08-28T23:59:59Z"
+      },
+      "status": "triggered",
+      "confidence": 0.65,
+      "created_at": "2025-08-28T07:00:00Z",
+      "updated_at": "2025-08-28T07:15:41Z",
+      "source": {
+        "news_ids": [
+          "140827",
+          "142977",
+          "142978",
+          "142951"
+        ],
+        "indicators": {
+          "H1": {
+            "ema_fast": 0.9336499379114015,
+            "ema_slow": 0.9348685505328078,
+            "rsi": 41.87712121410543
+          },
+          "spot": 0.93326
+        }
+      },
+      "decision": "accept",
+      "reason": "H1 shows slight bearish bias (ema_fast 0.93365 < ema_slow 0.93487) with RSI ~41.9 (not oversold). No strong momentum or EMA divergence -> market appears range/mean-reverting rather than strongly trending. Use reversal/pullback OCO (SELL_LIMIT + BUY_LIMIT) around current spot with safety buffers. | repriced closer"
     }
   ]
 }
