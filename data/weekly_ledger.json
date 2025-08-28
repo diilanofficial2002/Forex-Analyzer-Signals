@@ -709,6 +709,54 @@
       },
       "decision": "accept",
       "reason": "Market shows mild bearish structure on H1 (ema_fast 0.933992 < ema_slow 0.935275) with RSI ~42 (not oversold). No strong trending momentum and upcoming CHF GDP (medium) could trigger reversion around current levels; choose a reversal/pullback OCO (SELL_LIMIT + BUY_LIMIT) to capture bounce to resistance or support reversion. Entries respect 5 pip buffer from spot (spot 0.93359). | repriced closer"
+    },
+    {
+      "pair": "USD/JPY",
+      "oco_combo": [
+        "Sell Limit",
+        "Buy Limit"
+      ],
+      "orders": [
+        {
+          "type": "Sell Limit",
+          "entry": 147.749,
+          "sl": 148.34,
+          "tp": 147.14,
+          "rr": 1.03
+        },
+        {
+          "type": "Buy Limit",
+          "entry": 146.549,
+          "sl": 146.07,
+          "tp": 147.135,
+          "rr": 1.22
+        }
+      ],
+      "time_in_force": {
+        "type": "weekly",
+        "expires_at": "2025-08-28T23:59:59Z"
+      },
+      "status": "triggered",
+      "confidence": 0.62,
+      "created_at": "2025-08-28T08:00:00Z",
+      "updated_at": "2025-08-28T05:18:07Z",
+      "source": {
+        "news_ids": [
+          "142559",
+          "141464",
+          "142563"
+        ],
+        "indicators": {
+          "H1": {
+            "ema_fast": 147.4175424020269,
+            "ema_slow": 147.53644883940024,
+            "rsi": 35.20374212169967
+          },
+          "spot": 147.149
+        }
+      },
+      "decision": "accept",
+      "reason": "H1 shows mild bearish bias: ema_fast (147.4175) slightly below ema_slow (147.5364) and RSI ~35 (near oversold) but not extreme; market not strongly trending. High-impact US data imminent (Prelim GDP, Unemployment Claims) supports potential breakout but primary structure favors a mean-reversion / range-pocket with news risk. Chosen strategy: reversal/pullback (SELL_LIMIT + BUY_LIMIT) to capture bounces from current spot with safety buffers and balanced RR. | repriced closer"
     }
   ]
 }
