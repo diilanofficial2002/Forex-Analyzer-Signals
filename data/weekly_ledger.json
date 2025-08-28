@@ -521,6 +521,194 @@
       },
       "decision": "accept",
       "reason": "H1 shows mild bullish momentum: ema_fast (1.34789) > ema_slow (1.34735) and spreading, RSI ~65 (approaching overbought but still bullish). Upcoming high-impact USD GDP & Unemployment Claims may cause breakout moves. Therefore choose a breakout strategy to capture continuation (BUY_STOP + SELL_STOP). Entries respect 5-pip minimum buffer from spot (spot 1.35019)."
+    },
+    {
+      "pair": "EUR/USD",
+      "oco_combo": [
+        "Buy Stop",
+        "Sell Stop"
+      ],
+      "orders": [
+        {
+          "type": "Buy Stop",
+          "entry": 1.1663,
+          "sl": 1.1643,
+          "tp": 1.16955,
+          "rr": 1.63
+        },
+        {
+          "type": "Sell Stop",
+          "entry": 1.1629,
+          "sl": 1.1649,
+          "tp": 1.1597,
+          "rr": 1.6
+        }
+      ],
+      "time_in_force": {
+        "type": "weekly",
+        "expires_at": "2025-08-28T23:59:59Z"
+      },
+      "status": "triggered",
+      "confidence": 0.68,
+      "created_at": "2025-08-28T07:00:00Z",
+      "updated_at": "2025-08-28T01:00:44Z",
+      "source": {
+        "news_ids": [
+          "142559",
+          "141464"
+        ],
+        "indicators": {
+          "H1": {
+            "ema_fast": 1.1629460493653132,
+            "ema_slow": 1.1633016381724286,
+            "rsi": 60.68799322445613
+          },
+          "spot": 1.16463
+        }
+      },
+      "decision": "accept",
+      "reason": "Market shows mild bullish momentum but EMAs are nearly flat (ema_fast 1.16295 < ema_slow 1.16330) and RSI 60.69 below extreme \u2014 not a strong trending signal. Upcoming high-impact USD data (Prelim GDP, Unemployment Claims) could cause breakout; choose breakout OCO to capture either continuation or breakout around news. Buffer respected."
+    },
+    {
+      "pair": "GBP/USD",
+      "oco_combo": [
+        "Buy Stop",
+        "Sell Stop"
+      ],
+      "orders": [
+        {
+          "type": "Buy Stop",
+          "entry": 1.3512,
+          "sl": 1.3477,
+          "tp": 1.3562,
+          "rr": 1.43
+        },
+        {
+          "type": "Sell Stop",
+          "entry": 1.3498,
+          "sl": 1.3533,
+          "tp": 1.3448,
+          "rr": 1.43
+        }
+      ],
+      "time_in_force": {
+        "type": "weekly",
+        "expires_at": "2025-08-28T23:59:59Z"
+      },
+      "status": "triggered",
+      "confidence": 0.72,
+      "created_at": "2025-08-28T09:00:00Z",
+      "updated_at": "2025-08-28T01:01:05Z",
+      "source": {
+        "news_ids": [
+          "142559",
+          "141464"
+        ],
+        "indicators": {
+          "H1": {
+            "ema_fast": 1.3483561162111615,
+            "ema_slow": 1.3475735544107583,
+            "rsi": 66.44301486557328
+          },
+          "spot": 1.35052
+        }
+      },
+      "decision": "accept",
+      "reason": "H1 shows bullish bias: ema_fast(1.348356) > ema_slow(1.347574) and RSI=66.44 (approaching overbought) indicating momentum but not extreme; upcoming high-impact USD data (Prelim GDP, Unemployment Claims) could trigger continuation breakout. Choose breakout strategy to capture directional move around news and momentum."
+    },
+    {
+      "pair": "EUR/GBP",
+      "oco_combo": [
+        "Sell Limit",
+        "Buy Limit"
+      ],
+      "orders": [
+        {
+          "type": "Sell Limit",
+          "entry": 0.86289,
+          "sl": 0.8644,
+          "tp": 0.8614,
+          "rr": 0.99
+        },
+        {
+          "type": "Buy Limit",
+          "entry": 0.86189,
+          "sl": 0.8596,
+          "tp": 0.8634,
+          "rr": 0.66
+        }
+      ],
+      "time_in_force": {
+        "type": "weekly",
+        "expires_at": "2025-08-28T23:59:59Z"
+      },
+      "status": "triggered",
+      "confidence": 0.62,
+      "created_at": "2025-08-28T00:00:00Z",
+      "updated_at": "2025-08-28T01:01:31Z",
+      "source": {
+        "news_ids": [
+          "142977",
+          "142978",
+          "142951"
+        ],
+        "indicators": {
+          "H1": {
+            "ema_fast": 0.8624835568866487,
+            "ema_slow": 0.8632555351151049,
+            "rsi": 46.247366093134026
+          },
+          "spot": 0.86239
+        }
+      },
+      "decision": "accept",
+      "reason": "H1 shows slight bearish bias (ema_fast 0.86248 < ema_slow 0.86326) but EMAs are close and RSI ~46 (neutral). Market lacks strong trend or momentum and recent EUR news is low impact \u2014 favors a reversal/pullback approach. Chosen strategy: SELL_LIMIT + BUY_LIMIT to capture mean reversion at resistance/support levels. | repriced closer"
+    },
+    {
+      "pair": "EUR/CHF",
+      "oco_combo": [
+        "Sell Limit",
+        "Buy Limit"
+      ],
+      "orders": [
+        {
+          "type": "Sell Limit",
+          "entry": 0.93409,
+          "sl": 0.93569,
+          "tp": 0.93169,
+          "rr": 1.5
+        },
+        {
+          "type": "Buy Limit",
+          "entry": 0.93309,
+          "sl": 0.93059,
+          "tp": 0.93459,
+          "rr": 0.6
+        }
+      ],
+      "time_in_force": {
+        "type": "weekly",
+        "expires_at": "2025-08-28T23:59:59Z"
+      },
+      "status": "triggered",
+      "confidence": 0.62,
+      "created_at": "2025-08-28T09:00:00Z",
+      "updated_at": "2025-08-28T01:01:43Z",
+      "source": {
+        "news_ids": [
+          "140827"
+        ],
+        "indicators": {
+          "H1": {
+            "ema_fast": 0.933991637485232,
+            "ema_slow": 0.9352752394755894,
+            "rsi": 41.98935146865841
+          },
+          "spot": 0.93359
+        }
+      },
+      "decision": "accept",
+      "reason": "Market shows mild bearish structure on H1 (ema_fast 0.933992 < ema_slow 0.935275) with RSI ~42 (not oversold). No strong trending momentum and upcoming CHF GDP (medium) could trigger reversion around current levels; choose a reversal/pullback OCO (SELL_LIMIT + BUY_LIMIT) to capture bounce to resistance or support reversion. Entries respect 5 pip buffer from spot (spot 0.93359). | repriced closer"
     }
   ]
 }
