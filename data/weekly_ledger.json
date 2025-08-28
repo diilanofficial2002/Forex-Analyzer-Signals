@@ -532,17 +532,17 @@
       "orders": [
         {
           "type": "Buy Stop",
-          "entry": 1.1663,
-          "sl": 1.1643,
-          "tp": 1.16955,
-          "rr": 1.63
+          "entry": 1.168,
+          "sl": 1.1658,
+          "tp": 1.1737,
+          "rr": 2.59
         },
         {
           "type": "Sell Stop",
-          "entry": 1.1629,
-          "sl": 1.1649,
-          "tp": 1.1597,
-          "rr": 1.6
+          "entry": 1.165,
+          "sl": 1.1678,
+          "tp": 1.16,
+          "rr": 1.79
         }
       ],
       "time_in_force": {
@@ -550,25 +550,26 @@
         "expires_at": "2025-08-28T23:59:59Z"
       },
       "status": "triggered",
-      "confidence": 0.68,
+      "confidence": 0.78,
       "created_at": "2025-08-28T07:00:00Z",
-      "updated_at": "2025-08-28T01:00:44Z",
+      "updated_at": "2025-08-28T12:27:35Z",
       "source": {
         "news_ids": [
           "142559",
-          "141464"
+          "141464",
+          "142563"
         ],
         "indicators": {
           "H1": {
-            "ema_fast": 1.1629460493653132,
-            "ema_slow": 1.1633016381724286,
-            "rsi": 60.68799322445613
+            "ema_fast": 1.1645351159818642,
+            "ema_slow": 1.163928486139985,
+            "rsi": 68.0226330143453
           },
-          "spot": 1.16463
+          "spot": 1.1673
         }
       },
       "decision": "accept",
-      "reason": "Market shows mild bullish momentum but EMAs are nearly flat (ema_fast 1.16295 < ema_slow 1.16330) and RSI 60.69 below extreme \u2014 not a strong trending signal. Upcoming high-impact USD data (Prelim GDP, Unemployment Claims) could cause breakout; choose breakout OCO to capture either continuation or breakout around news. Buffer respected."
+      "reason": "H1 shows bullish structure: ema_fast (1.164535) > ema_slow (1.163928) and RSI ~68 indicating strong bullish momentum but not extreme; spot (1.16730) is above EMAs. Upcoming high-impact USD GDP/Unemployment news may trigger continuation breakout. Chosen strategy: Breakout (BUY_STOP + SELL_STOP) to capture continuation or fast reversal around news."
     },
     {
       "pair": "GBP/USD",
@@ -579,17 +580,17 @@
       "orders": [
         {
           "type": "Buy Stop",
-          "entry": 1.3512,
-          "sl": 1.3477,
-          "tp": 1.3562,
-          "rr": 1.43
+          "entry": 1.352,
+          "sl": 1.3495,
+          "tp": 1.357,
+          "rr": 2.0
         },
         {
           "type": "Sell Stop",
-          "entry": 1.3498,
-          "sl": 1.3533,
-          "tp": 1.3448,
-          "rr": 1.43
+          "entry": 1.349,
+          "sl": 1.3515,
+          "tp": 1.344,
+          "rr": 2.0
         }
       ],
       "time_in_force": {
@@ -599,7 +600,7 @@
       "status": "triggered",
       "confidence": 0.72,
       "created_at": "2025-08-28T09:00:00Z",
-      "updated_at": "2025-08-28T01:01:05Z",
+      "updated_at": "2025-08-28T12:27:51Z",
       "source": {
         "news_ids": [
           "142559",
@@ -607,15 +608,15 @@
         ],
         "indicators": {
           "H1": {
-            "ema_fast": 1.3483561162111615,
-            "ema_slow": 1.3475735544107583,
-            "rsi": 66.44301486557328
+            "ema_fast": 1.3499402543149495,
+            "ema_slow": 1.3486234363003848,
+            "rsi": 59.359787201540215
           },
-          "spot": 1.35052
+          "spot": 1.35103
         }
       },
       "decision": "accept",
-      "reason": "H1 shows bullish bias: ema_fast(1.348356) > ema_slow(1.347574) and RSI=66.44 (approaching overbought) indicating momentum but not extreme; upcoming high-impact USD data (Prelim GDP, Unemployment Claims) could trigger continuation breakout. Choose breakout strategy to capture directional move around news and momentum."
+      "reason": "H1 shows mild bullish structure: EMA_fast (1.34994) > EMA_slow (1.34862) with spread ~13 pips and RSI ~59 (momentum but not overbought). Upcoming high-impact USD data (Prelim GDP, Unemployment Claims) could trigger directional continuation \u2014 choose breakout strategy to capture momentum. Buffer requirement met."
     },
     {
       "pair": "EUR/GBP",
